@@ -1,0 +1,28 @@
+
+%skip: ' ' | '\t' | '\n';
+
+`string`: '\"' ['a'-'z', ' ', 'A'-'Z', '/', '.', '-']* '\"';
+
+`integer`: ['0' - '9']+;
+
+text: '['
+	((`string` #lines[])
+	(',' `string` #lines[])*)?
+']';
+
+file: `string` #path ":" (`string` #srcpath | text #content);
+
+variable: `string` #name ':' `string` #value;
+
+environment: '{' (variable #variables[] (',' variable #variables[])*)? '}';
+
+test: '{'
+	(("\"files\"" ":" '{' ((file #files[]) (',' file #files[])*)? '}'
+	| "\"commands\"" ":" text #commands
+	| "\"environment\"" ":" environment #environment
+	| "\"input\"" ":" text #input
+	| "\"output\"" ":" text #output
+	| "\"exit-code\"" ":" (`integer :"%u"` #code)) ","?)* '}';
+
+%start: '[' ((test #tests[]) (',' test #tests[])*)? ']';
+

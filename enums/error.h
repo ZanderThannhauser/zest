@@ -1,0 +1,11 @@
+
+#ifndef ENUM_ERROR
+#define ENUM_ERROR
+
+enum error
+{
+	e_success,
+	e_syscall_failed,
+};
+
+#endif

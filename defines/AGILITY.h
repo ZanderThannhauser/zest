@@ -1,0 +1,3 @@
+
+#define AGILITY (100)
+
