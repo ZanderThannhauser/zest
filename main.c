@@ -139,7 +139,7 @@ int main(int argc, char* const* argv)
 	
 	if (is_passing)
 	{
-		puts("\e[33m" "all tests pass!" "\e[m");
+		puts("\e[32m" "all tests pass!" "\e[m");
 	}
 	
 	store_database(flattened_records.data, flattened_records.n, DATABASE_PATH);
