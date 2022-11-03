@@ -172,8 +172,10 @@ bool run_test(int zest_dirfd, const struct test* test)
 						"exit-code! (expected %u, actual: %u)\n",
 						argv0, buffer.data, ztest->code, WEXITSTATUS(wstatus));
 					
+					#if 0
 					printf("%s: look at the output of the test at "
 						"'/tmp/zest/stdout.txt'.\n", argv0);
+					#endif
 					
 					result = false;
 				}
