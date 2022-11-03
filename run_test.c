@@ -140,8 +140,6 @@ bool run_test(int zest_dirfd, const struct test* test)
 			
 			dpvs(buffer.data);
 			
-			printf("running shell '%s':\n", buffer.data);
-			
 			char* cmd[] = {"sh", "-c", buffer.data, NULL};
 			
 			pid_t child = -1;
@@ -153,11 +151,11 @@ bool run_test(int zest_dirfd, const struct test* test)
 				if (waitpid(child, &wstatus, 0) < 0)
 					fprintf(stderr, "%s: waitpid(): %m\n", argv0), result = false;
 				else if (!WIFEXITED(wstatus))
-					fprintf(stderr, "%s: subtask did not exit normally!\n", argv0), result = false;
+					fprintf(stderr, "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
 				else if (ztest->code != WEXITSTATUS(wstatus))
-					fprintf(stderr, "%s: subtask did not return expected "
+					fprintf(stderr, "%s: subtask '%s' did not return expected "
 						"exit-code! (expected %u, actual: %u)\n",
-						argv0, ztest->code, WEXITSTATUS(wstatus)), result = false;
+						argv0, buffer.data, ztest->code, WEXITSTATUS(wstatus)), result = false;
 			}
 			else if (fchdir(zest_dirfd) < 0)
 				fprintf(stderr, "%s: fchdir(): %m\n", argv0), result = false;
