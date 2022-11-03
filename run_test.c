@@ -153,14 +153,37 @@ bool run_test(int zest_dirfd, const struct test* test)
 				else if (!WIFEXITED(wstatus))
 					fprintf(stderr, "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
 				else if (ztest->code != WEXITSTATUS(wstatus))
+				{
 					fprintf(stderr, "%s: subtask '%s' did not return expected "
 						"exit-code! (expected %u, actual: %u)\n",
-						argv0, buffer.data, ztest->code, WEXITSTATUS(wstatus)), result = false;
+						argv0, buffer.data, ztest->code, WEXITSTATUS(wstatus));
+					
+					printf("%s: look at the output of the test at "
+						"'/tmp/zest/stdout.txt'.\n", argv0);
+					
+					result = false;
+				}
 			}
 			else if (fchdir(zest_dirfd) < 0)
 				fprintf(stderr, "%s: fchdir(): %m\n", argv0), result = false;
-			else if (execvp(cmd[0], cmd) < 0)
-				fprintf(stderr, "%s: execvp(): %m\n", argv0), result = false;
+			else
+			{
+				int stdout_fd = open("./stdout.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
+				int stderr_fd = open("./stderr.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
+				
+				if (stdout_fd < 0)
+					fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
+				else if (stderr_fd < 0)
+					fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
+				else if (dup2(stdout_fd, 1) < 0)
+					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
+				else if (dup2(stderr_fd, 2) < 0)
+					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
+				else if (execvp(cmd[0], cmd) < 0)
+					fprintf(stderr, "%s: execvp(): %m\n", argv0), result = false;
+				
+				close(stdout_fd), close(stderr_fd);
+			}
 		}
 	}
 	

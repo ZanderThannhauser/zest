@@ -324,7 +324,7 @@ const unsigned zebu_gotos[96][18] = {
 };
 
 
-const unsigned zebu_lexer[75][126] = {
+const unsigned zebu_lexer[75][127] = {
 	[1][9] = 15,
 	[1][10] = 15,
 	[1][32] = 15,
@@ -421,6 +421,7 @@ const unsigned zebu_lexer[75][126] = {
 	[25][45] = 25,
 	[25][46] = 25,
 	[25][47] = 25,
+	[25][61] = 25,
 	[25][65] = 25,
 	[25][66] = 25,
 	[25][67] = 25,
@@ -447,6 +448,7 @@ const unsigned zebu_lexer[75][126] = {
 	[25][88] = 25,
 	[25][89] = 25,
 	[25][90] = 25,
+	[25][95] = 25,
 	[25][97] = 25,
 	[25][98] = 25,
 	[25][99] = 25,
@@ -473,6 +475,7 @@ const unsigned zebu_lexer[75][126] = {
 	[25][120] = 25,
 	[25][121] = 25,
 	[25][122] = 25,
+	[25][126] = 25,
 	[26][111] = 32,
 	[27][110] = 33,
 	[27][120] = 34,
@@ -691,6 +694,7 @@ static void print_tree_escape(char *out, char in)
 		case ':': case ';':
 		case ',': case '.':
 		case '_':
+		case '/':
 		case '`':
 		case '0' ... '9':
 		case 'a' ... 'z':
@@ -1201,6 +1205,7 @@ static void escape(char *out, unsigned char in)
 		case ':': case ';':
 		case ',': case '.':
 		case '_':
+		case '/':
 		case '0' ... '9':
 		case 'a' ... 'z':
 		case 'A' ... 'Z':
