@@ -3,6 +3,7 @@
 		"./zest": "./gen/release-build/zest"
 	},
 	"commands": [
-		"./zest --verbose"
+		"./zest -v"
 	],
+	"exit-code": 1
 }]

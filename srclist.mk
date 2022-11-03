@@ -34,6 +34,7 @@ srcs += ./record/compare.c
 srcs += ./record/free.c
 srcs += ./record/inc.c
 srcs += ./record/new.c
+srcs += ./run_test.c
 srcs += ./store_database.c
 srcs += ./test/compare.c
 srcs += ./test/free.c

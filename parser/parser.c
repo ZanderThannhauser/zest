@@ -691,7 +691,6 @@ static void print_tree_escape(char *out, char in)
 		case ':': case ';':
 		case ',': case '.':
 		case '_':
-		case '/':
 		case '`':
 		case '0' ... '9':
 		case 'a' ... 'z':
@@ -1202,7 +1201,6 @@ static void escape(char *out, unsigned char in)
 		case ':': case ';':
 		case ',': case '.':
 		case '_':
-		case '/':
 		case '0' ... '9':
 		case 'a' ... 'z':
 		case 'A' ... 'Z':

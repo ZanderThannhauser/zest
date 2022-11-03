@@ -1,5 +1,19 @@
 
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <ftw.h>
+
 #include <debug.h>
+
+#include <defines/argv0.h>
+
+#include <enums/error.h>
+
+#include <macros/strequals.h>
+
+#include <avl/tree_t.h>
+#include <avl/insert.h>
 
 #include <test/new.h>
 

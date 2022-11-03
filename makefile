@@ -48,7 +48,7 @@ else
 $(error "invalid on_error option!");
 endif
 
-buildprefix = bin/$(buildtype)-build
+buildprefix = gen/$(buildtype)-build
 depprefix   = dep/$(buildtype)-build
 
 default: $(buildprefix)/zest
@@ -73,7 +73,7 @@ tracerun: $(buildprefix)/zest
 	strace $< $(ARGS)
 
 install: $(buildprefix)/zest
-	@ mkdir -vp ~/bin/
+	@ mkdir -vp ~/gen/
 	@ cp -vau $(buildprefix)/zest ~/bin/zest
 
 .PRECIOUS: %/

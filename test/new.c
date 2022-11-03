@@ -1,5 +1,9 @@
 
+#include <string.h>
+
 #include <debug.h>
+
+#include <memory/smalloc.h>
 
 #include <parser/parser.h>
 

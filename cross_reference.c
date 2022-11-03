@@ -1,9 +1,24 @@
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
+#include <string.h>
+
 #include <debug.h>
+
+#include <avl/tree_t.h>
+#include <avl/insert.h>
+#include <avl/delete_node.h>
+
+#include <defines/argv0.h>
+
+#include <enums/error.h>
 
 #include <test/struct.h>
 
+#include <record/struct.h>
 #include <record/new.h>
+#include <record/compare.h>
 
 #include "cross_reference.h"
 
@@ -18,7 +33,37 @@ void cross_reference(
 	
 	while (tnode && rnode)
 	{
-		TODO;
+		struct test *at = tnode->item;
+		struct record *rt = rnode->item;
+		
+		int cmp = strcmp(at->path, rt->path) ?: at->index - rt->index;
+		
+		if (cmp < 0)
+		{
+			dpvs(at->path);
+			dpv(at->index);
+			
+			struct record* record = new_record(at->path, at->index, 0.0);
+			
+			if (!avl_insert(records, record))
+			{
+				fprintf(stderr, "%s: avl_insert(): %m\n", argv0);
+				exit(e_syscall_failed);
+			}
+			
+			tnode = tnode->next;
+		}
+		else if (cmp > 0)
+		{
+			struct avl_node_t* new = rnode->next;
+			avl_delete_node(records, rnode);
+			rnode = new;
+		}
+		else
+		{
+			tnode = tnode->next;
+			rnode = rnode->next;
+		}
 	}
 	
 	while (tnode)
@@ -41,7 +86,9 @@ void cross_reference(
 	
 	while (rnode)
 	{
-		TODO;
+		struct avl_node_t* new = rnode->next;
+		avl_delete_node(records, rnode);
+		rnode = new;
 	}
 	
 	EXIT;

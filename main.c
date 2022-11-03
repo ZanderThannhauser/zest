@@ -1,9 +1,24 @@
 
+#include <string.h>
+#include <unistd.h>
+#include <assert.h>
+#include <fcntl.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <debug.h>
 
+#include <defines/argv0.h>
 #include <defines/DATABASE_PATH.h>
+#include <defines/AGILITY.h>
+
+#include <enums/error.h>
+
+#include <avl/alloc_tree.h>
+#include <avl/search.h>
+#include <avl/free_tree.h>
 
 #include <cmdln/flags.h>
 #include <cmdln/process.h>
@@ -11,6 +26,7 @@
 
 #include <parser/parse_files.h>
 
+#include <test/struct.h>
 #include <test/compare.h>
 #include <test/free.h>
 
@@ -23,6 +39,8 @@
 #include <cross_reference.h>
 
 #include <store_database.h>
+
+#include <run_test.h>
 
 int main(int argc, char* const* argv)
 {
@@ -68,19 +86,53 @@ int main(int argc, char* const* argv)
 				else if ((*A)->score < (*B)->score)
 					return -1;
 				else
-					return +0;
+					return strcmp((*A)->path, (*B)->path);
 			}
 			compare;
 		}));
 	
-	for (unsigned i = 0, n = flattened_records.n; i < n; i++)
+	int tmp_dirfd = -1, zest_dirfd = -1;
+	
+	if ((tmp_dirfd = open("/tmp/", O_PATH)) < 0)
+	{
+		fprintf(stderr, "%s: open(\"/tmp/\"): %m\n", argv0);
+		exit(e_syscall_failed);
+	}
+	else if (mkdirat(tmp_dirfd, "zest", 0774) < 0 && errno != EEXIST)
+	{
+		fprintf(stderr, "%s: mkdir(\"zest\"): %m\n", argv0);
+		exit(e_syscall_failed);
+	}
+	else if ((zest_dirfd = openat(tmp_dirfd, "zest", O_PATH)) < 0)
+	{
+		fprintf(stderr, "%s: open(\"zest\"): %m\n", argv0);
+		exit(e_syscall_failed);
+	}
+	
+	bool is_passing = true;
+	
+	for (unsigned i = 0, n = flattened_records.n; is_passing && i < n; i++)
 	{
 		struct record* record = flattened_records.data[i];
 		
 		printf("running test in '%s'[%u] (score %Lg%%):\n",
 			record->path, record->index, record->score * 100);
 		
-		// run test
+		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
+		
+		assert(node);
+		
+		is_passing = run_test(zest_dirfd, node->item);
+		
+		if (is_passing)
+			record->score = (1 + record->score * (AGILITY - 1)) / AGILITY;
+		else
+			record->score = (0 + record->score * (AGILITY - 1)) / AGILITY;
+	}
+	
+	if (is_passing)
+	{
+		puts("all tests pass!");
 	}
 	
 	store_database(flattened_records.data, flattened_records.n, DATABASE_PATH);
@@ -93,8 +145,12 @@ int main(int argc, char* const* argv)
 	
 	free_cmdln(flags);
 	
+	close(zest_dirfd);
+	
+	close(tmp_dirfd);
+	
 	EXIT;
-	return 0;
+	return is_passing ? 0 : e_failed_test;
 }
 
 

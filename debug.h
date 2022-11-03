@@ -41,10 +41,13 @@
 	struct avl_node_t;
 	struct zebu_test;
 	struct record;
+	struct test;
 	
 	#include <avl/alloc_tree.h>
 	#include <avl/free_tree.h>
 	#include <avl/insert.h>
+	#include <avl/search.h>
+	#include <avl/delete_node.h>
 	
 #endif
 

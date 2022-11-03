@@ -5,10 +5,7 @@
 
 `integer`: ['0' - '9']+;
 
-text: '['
-	((`string` #lines[])
-	(',' `string` #lines[])*)?
-']';
+text: '[' ((`string` #lines[]) (',' `string` #lines[])*)? ']';
 
 file: `string` #path ":" (`string` #srcpath | text #content);
 

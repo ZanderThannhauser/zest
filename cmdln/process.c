@@ -1,5 +1,9 @@
 
+#include <unistd.h>
+
 #include <debug.h>
+
+#include <memory/smalloc.h>
 
 #include "flags.h"
 #include "usage.h"
@@ -23,6 +27,7 @@ struct cmdln_flags* cmdln_process(int argc, char* const* argv)
 		{
 			case 'v':
 				verbose = true;
+				dpvb(verbose);
 				break;
 			
 			case 'h':
@@ -36,6 +41,8 @@ struct cmdln_flags* cmdln_process(int argc, char* const* argv)
 	}
 	
 	const char* input_directory = argv[optind++];
+	
+	dpvs(input_directory);
 	
 	if (!input_directory)
 	{

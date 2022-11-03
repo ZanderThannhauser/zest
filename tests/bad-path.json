@@ -1,0 +1,6 @@
+[{
+	"commands": [
+		"./zest /bad/path"
+	],
+	"exit-code": 1,
+}]
