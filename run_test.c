@@ -94,28 +94,42 @@ bool run_test(int zest_dirfd, const struct test* test)
 				fprintf(stderr, "%s: fstat(): %m\n", argv0), result = false;
 			else if (fchmod(dstfd, statbuf.st_mode) < 0)
 				fprintf(stderr, "%s: fchmod(): %m\n", argv0), result = false;
-			
-			char buffer[4096];
-			ssize_t rrettval;
-			
-			while (result && (rrettval = read(srcfd, buffer, sizeof(buffer))) > 0)
+			else
 			{
-				if (write(dstfd, buffer, rrettval) != rrettval)
+				char buffer[4096];
+				ssize_t rrettval;
+				
+				while (result && (rrettval = read(srcfd, buffer, sizeof(buffer))) > 0)
 				{
-					fprintf(stderr, "%s: write(): %m\n", argv0), result = true;
+					if (write(dstfd, buffer, rrettval) != rrettval)
+					{
+						fprintf(stderr, "%s: write(): %m\n", argv0), result = false;
+					}
 				}
-			}
-			
-			if (rrettval < 0)
-			{
-				fprintf(stderr, "%s: read(): %m\n", argv0), result = true;
+				
+				if (rrettval < 0)
+				{
+					fprintf(stderr, "%s: read(): %m\n", argv0), result = false;
+				}
 			}
 			
 			close(srcfd);
 		}
 		else if (file->content)
 		{
-			TODO;
+			for (unsigned i = 0, n = file->content->lines.n; result && i < n; i++)
+			{
+				convert(file->content->lines.data[i]);
+				
+				dpvs(buffer.data);
+				
+				buffer.n--, append('\n');
+				
+				if (write(dstfd, buffer.data, buffer.n) != buffer.n)
+				{
+					fprintf(stderr, "%s: write(): %m\n", argv0), result = false;
+				}
+			}
 		}
 		else
 		{

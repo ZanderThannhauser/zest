@@ -1,0 +1,11 @@
+[{
+	"files": {
+		"./test.txt": [
+			"abc",
+			"def"
+		]
+	},
+	"commands": [
+		"wc ./test.txt"
+	]
+}]
