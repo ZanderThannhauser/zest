@@ -165,7 +165,9 @@ bool run_test(int zest_dirfd, const struct test* test)
 	
 	if (result)
 	{
-		for (unsigned i = 0, n = ztest->commands->lines.n; result && i < n; i++)
+		int code = 0;
+		
+		for (unsigned i = 0, n = ztest->commands->lines.n; result && !code && i < n; i++)
 		{
 			int wstatus;
 			
@@ -185,17 +187,8 @@ bool run_test(int zest_dirfd, const struct test* test)
 					fprintf(stderr, "\n" "%s: waitpid(): %m\n", argv0), result = false;
 				else if (!WIFEXITED(wstatus))
 					fprintf(stderr, "\n" "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
-				else if (ztest->code != WEXITSTATUS(wstatus))
-				{
-					fprintf(stderr, "\n" "%s: subtask '%s' did not return expected "
-						"exit-code! (expected %u, actual: %u)\n",
-						argv0, buffer.data, ztest->code, WEXITSTATUS(wstatus));
-					
-					printf("%s: look at the output of the test at "
-						"'/tmp/zest/output.txt'.\n", argv0);
-					
-					result = false;
-				}
+				else
+					code = WEXITSTATUS(wstatus);
 			}
 			else if (fchdir(zest_dirfd) < 0)
 				fprintf(stderr, "\n" "%s: fchdir(): %m\n", argv0), result = false;
@@ -216,6 +209,18 @@ bool run_test(int zest_dirfd, const struct test* test)
 				
 				close(output_fd);
 			}
+		}
+		
+		if (code != ztest->code)
+		{
+			fprintf(stderr, "\n" "%s: subtask '%s' did not return expected "
+				"exit-code! (expected %u, actual: %u)\n",
+				argv0, buffer.data, ztest->code, code);
+			
+			printf("%s: look at the output of the test at "
+				"'/tmp/zest/output.txt'.\n", argv0);
+			
+			result = false;
 		}
 	}
 	
