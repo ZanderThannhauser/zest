@@ -182,6 +182,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 				fprintf(stderr, "%s: fchdir(): %m\n", argv0), result = false;
 			else
 			{
+				#if 0
 				int stdout_fd = open("./stdout.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
 				int stderr_fd = open("./stderr.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
 				
@@ -193,10 +194,15 @@ bool run_test(int zest_dirfd, const struct test* test)
 					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
 				else if (dup2(stderr_fd, 2) < 0)
 					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
-				else if (execvp(cmd[0], cmd) < 0)
+				else
+				#endif
+				
+				if (execvp(cmd[0], cmd) < 0)
 					fprintf(stderr, "%s: execvp(): %m\n", argv0), result = false;
 				
+				#if 0
 				close(stdout_fd), close(stderr_fd);
+				#endif
 			}
 		}
 	}
