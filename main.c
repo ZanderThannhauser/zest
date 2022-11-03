@@ -115,7 +115,8 @@ int main(int argc, char* const* argv)
 	{
 		struct record* record = flattened_records.data[i];
 		
-		printf("[%u/%u]: running test in '%s'[%u] (score %Lg%%):\n",
+		printf(
+			"\e[33m" "[%u/%u]: running test in '%s'[%u] (score %Lg%%)" "\e[m" ":\n",
 			i + 1, n,
 			record->path, record->index, record->score * 100);
 		
