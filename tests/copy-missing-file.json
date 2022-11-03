@@ -1,0 +1,23 @@
+[{
+	"files": {
+		"./zest": "./gen/release-build/zest",
+		
+		"./test.json": [
+			"[{",
+				"\"files\": {",
+					"\"./copyme.txt\": \"missing/path.txt\"",
+				"},",
+				"\"commands\": [",
+					"\"wc ./copyme.txt\"",
+				"]",
+			"}]"
+		]
+		
+	},
+	
+	"commands": [
+		"./zest ."
+	],
+	
+	"exit-code": 2
+}]

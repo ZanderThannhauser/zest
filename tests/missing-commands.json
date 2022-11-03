@@ -1,0 +1,13 @@
+[{
+	"files": {
+		"./zest": "./gen/release-build/zest",
+		
+		"./test.json": [
+			"[{}]"
+		]
+	},
+	"commands": [
+		"./zest ."
+	],
+	"exit-code": 2
+}]

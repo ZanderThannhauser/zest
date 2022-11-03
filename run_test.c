@@ -43,7 +43,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 		buffer.data[buffer.n++] = c;
 	}
 	
-	void convert(struct zebu_token* token)
+	bool convert(struct zebu_token* token)
 	{
 		buffer.n = 0;
 		
@@ -53,7 +53,16 @@ bool run_test(int zest_dirfd, const struct test* test)
 		{
 			if (*start == '\\')
 			{
-				TODO;
+				switch (*++start)
+				{
+					case '\"': append('\"'), start++; break;
+					
+					case '\\': append('\\'), start++; break;
+					
+					default:
+						fprintf(stderr, "\n" "%s: unknown escape sequence '\\%c'!\n", argv0, *start);
+						return false;
+				}
 			}
 			else
 			{
@@ -62,6 +71,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 		}
 		
 		append(0);
+		return true;
 	}
 	
 	struct zebu_test* ztest = test->ztest;
@@ -70,78 +80,87 @@ bool run_test(int zest_dirfd, const struct test* test)
 	{
 		struct zebu_file* file = ztest->files.data[i];
 		
-		convert(file->path);
+		result = convert(file->path);
 		
-		dpvs(buffer.data);
-		
-		int dstfd = openat(zest_dirfd, buffer.data, O_WRONLY | O_TRUNC | O_CREAT, 0664);
-		
-		if (dstfd < 0)
-			fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
-		else if (file->srcpath)
+		if (result)
 		{
-			convert(file->srcpath);
-			
 			dpvs(buffer.data);
 			
-			int srcfd = open(buffer.data, O_RDONLY);
+			int dstfd = openat(zest_dirfd, buffer.data, O_WRONLY | O_TRUNC | O_CREAT, 0664);
 			
-			struct stat statbuf;
-			
-			if (srcfd < 0)
-				fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
-			else if (fstat(srcfd, &statbuf) < 0)
-				fprintf(stderr, "%s: fstat(): %m\n", argv0), result = false;
-			else if (fchmod(dstfd, statbuf.st_mode) < 0)
-				fprintf(stderr, "%s: fchmod(): %m\n", argv0), result = false;
-			else
+			if (dstfd < 0)
+				fprintf(stderr, "\n" "%s: open(): %m\n", argv0), result = false;
+			else if (file->srcpath)
 			{
-				char buffer[4096];
-				ssize_t rrettval;
+				convert(file->srcpath);
 				
-				while (result && (rrettval = read(srcfd, buffer, sizeof(buffer))) > 0)
+				if (result)
 				{
-					if (write(dstfd, buffer, rrettval) != rrettval)
+					dpvs(buffer.data);
+					
+					int srcfd = open(buffer.data, O_RDONLY);
+					
+					struct stat statbuf;
+					
+					if (srcfd < 0)
+						fprintf(stderr, "\n" "%s: open(\"%s\"): %m\n", argv0, buffer.data), result = false;
+					else if (fstat(srcfd, &statbuf) < 0)
+						fprintf(stderr, "\n" "%s: fstat(): %m\n", argv0), result = false;
+					else if (fchmod(dstfd, statbuf.st_mode) < 0)
+						fprintf(stderr, "\n" "%s: fchmod(): %m\n", argv0), result = false;
+					else
 					{
-						fprintf(stderr, "%s: write(): %m\n", argv0), result = false;
+						char buffer[4096];
+						ssize_t rrettval;
+						
+						while (result && (rrettval = read(srcfd, buffer, sizeof(buffer))) > 0)
+						{
+							if (write(dstfd, buffer, rrettval) != rrettval)
+							{
+								fprintf(stderr, "\n" "%s: write(): %m\n", argv0), result = false;
+							}
+						}
+						
+						if (rrettval < 0)
+						{
+							fprintf(stderr, "\n" "%s: read(): %m\n", argv0), result = false;
+						}
+					}
+					
+					close(srcfd);
+				}
+			}
+			else if (file->content)
+			{
+				for (unsigned i = 0, n = file->content->lines.n; result && i < n; i++)
+				{
+					convert(file->content->lines.data[i]);
+					
+					if (result)
+					{
+						dpvs(buffer.data);
+						
+						buffer.n--, append('\n');
+						
+						if (write(dstfd, buffer.data, buffer.n) != buffer.n)
+						{
+							fprintf(stderr, "\n" "%s: write(): %m\n", argv0), result = false;
+						}
 					}
 				}
-				
-				if (rrettval < 0)
-				{
-					fprintf(stderr, "%s: read(): %m\n", argv0), result = false;
-				}
+			}
+			else
+			{
+				TODO;
 			}
 			
-			close(srcfd);
+			close(dstfd);
 		}
-		else if (file->content)
-		{
-			for (unsigned i = 0, n = file->content->lines.n; result && i < n; i++)
-			{
-				convert(file->content->lines.data[i]);
-				
-				dpvs(buffer.data);
-				
-				buffer.n--, append('\n');
-				
-				if (write(dstfd, buffer.data, buffer.n) != buffer.n)
-				{
-					fprintf(stderr, "%s: write(): %m\n", argv0), result = false;
-				}
-			}
-		}
-		else
-		{
-			TODO;
-		}
-		
-		close(dstfd);
 	}
 	
 	if (!ztest->commands)
 	{
-		fprintf(stderr, "%s: test missing commands!\n", argv0), result = false;
+		fprintf(stderr, "\n" "%s: test missing commands!\n", argv0), result = false;
 	}
 	
 	if (result)
@@ -159,52 +178,43 @@ bool run_test(int zest_dirfd, const struct test* test)
 			pid_t child = -1;
 			
 			if ((child = fork()) < 0)
-				fprintf(stderr, "%s: fork(): %m\n", argv0), result = false;
+				fprintf(stderr, "\n" "%s: fork(): %m\n", argv0), result = false;
 			else if (child)
 			{
 				if (waitpid(child, &wstatus, 0) < 0)
-					fprintf(stderr, "%s: waitpid(): %m\n", argv0), result = false;
+					fprintf(stderr, "\n" "%s: waitpid(): %m\n", argv0), result = false;
 				else if (!WIFEXITED(wstatus))
-					fprintf(stderr, "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
+					fprintf(stderr, "\n" "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
 				else if (ztest->code != WEXITSTATUS(wstatus))
 				{
-					fprintf(stderr, "%s: subtask '%s' did not return expected "
+					fprintf(stderr, "\n" "%s: subtask '%s' did not return expected "
 						"exit-code! (expected %u, actual: %u)\n",
 						argv0, buffer.data, ztest->code, WEXITSTATUS(wstatus));
 					
-					#if 0
 					printf("%s: look at the output of the test at "
-						"'/tmp/zest/stdout.txt'.\n", argv0);
-					#endif
+						"'/tmp/zest/output.txt'.\n", argv0);
 					
 					result = false;
 				}
 			}
 			else if (fchdir(zest_dirfd) < 0)
-				fprintf(stderr, "%s: fchdir(): %m\n", argv0), result = false;
+				fprintf(stderr, "\n" "%s: fchdir(): %m\n", argv0), result = false;
 			else
 			{
-				#if 0
-				int stdout_fd = open("./stdout.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
-				int stderr_fd = open("./stderr.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
+				int output_fd = open("./output.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
 				
-				if (stdout_fd < 0)
-					fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
-				else if (stderr_fd < 0)
-					fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
-				else if (dup2(stdout_fd, 1) < 0)
-					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
-				else if (dup2(stderr_fd, 2) < 0)
-					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
-				else
-				#endif
+				if (output_fd < 0)
+					fprintf(stderr, "\n" "%s: open(): %m\n", argv0), result = false;
+				else if (close(0) < 0)
+					fprintf(stderr, "\n" "%s: close(): %m\n", argv0), result = false;
+				else if (dup2(output_fd, 1) < 0)
+					fprintf(stderr, "\n" "%s: dup2(): %m\n", argv0), result = false;
+				else if (dup2(output_fd, 2) < 0)
+					fprintf(stderr, "\n" "%s: dup2(): %m\n", argv0), result = false;
+				else if (execvp(cmd[0], cmd) < 0)
+					fprintf(stderr, "\n" "%s: execvp(): %m\n", argv0), result = false;
 				
-				if (execvp(cmd[0], cmd) < 0)
-					fprintf(stderr, "%s: execvp(): %m\n", argv0), result = false;
-				
-				#if 0
-				close(stdout_fd), close(stderr_fd);
-				#endif
+				close(output_fd);
 			}
 		}
 	}

@@ -1,4 +1,7 @@
 [{
+	"files": {
+		"./zest": "./gen/release-build/zest"
+	},
 	"commands": [
 		"./zest /bad/path"
 	],

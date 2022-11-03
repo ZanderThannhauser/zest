@@ -116,14 +116,10 @@ int main(int argc, char* const* argv)
 		struct record* record = flattened_records.data[i];
 		
 		printf(
-			"\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m" "\n",
+			"\r" "\e[K" "\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m",
 			i + 1, n, record->index, record->path);
 		
-		#if 0
-		printf(
-			"\e[33m" "[%u/%u]: running test %u of '%s' (score: %Lg%%)..." "\e[m" "\n",
-			i + 1, n, record->index, record->path, record->score * 100);
-		#endif
+		fflush(stdout);
 		
 		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
 		
@@ -139,7 +135,7 @@ int main(int argc, char* const* argv)
 	
 	if (is_passing)
 	{
-		puts("\e[32m" "all tests pass!" "\e[m");
+		puts("\r" "\e[K" "\e[32m" "all tests pass!" "\e[m");
 	}
 	
 	store_database(flattened_records.data, flattened_records.n, DATABASE_PATH);
