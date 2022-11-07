@@ -10,6 +10,7 @@ buildtype ?= release
 
 ifeq ($(buildtype), release)
 CPPFLAGS += -D RELEASE
+#CPPFLAGS += -D ZEBU_DEBUG
 
 CFLAGS += -O2
 CFLAGS += -flto
@@ -73,7 +74,7 @@ tracerun: $(buildprefix)/zest
 	strace $< $(ARGS)
 
 install: $(buildprefix)/zest
-	@ mkdir -vp ~/gen/
+	@ mkdir -vp ~/bin/
 	@ cp -vau $(buildprefix)/zest ~/bin/zest
 
 .PRECIOUS: %/

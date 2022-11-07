@@ -117,7 +117,7 @@ int main(int argc, char* const* argv)
 		
 		printf(
 			"\r" "\e[K" "\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m",
-			i + 1, n, record->index, record->path);
+			i + 1, n, record->index + 1, record->path);
 		
 		fflush(stdout);
 		
