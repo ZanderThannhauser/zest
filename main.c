@@ -116,7 +116,7 @@ int main(int argc, char* const* argv)
 		struct record* record = flattened_records.data[i];
 		
 		printf(
-			"\r" "\e[K" "\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m",
+			"\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m" "\n",
 			i + 1, n, record->index + 1, record->path);
 		
 		fflush(stdout);
@@ -135,7 +135,7 @@ int main(int argc, char* const* argv)
 	
 	if (is_passing)
 	{
-		puts("\r" "\e[K" "\e[32m" "all tests pass!" "\e[m");
+		printf("\e[K" "\e[32m" "all tests pass!" "\e[m" "\n");
 	}
 	
 	store_database(flattened_records.data, flattened_records.n, DATABASE_PATH);

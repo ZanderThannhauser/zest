@@ -60,7 +60,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 					case '\\': append('\\'), start++; break;
 					
 					default:
-						fprintf(stderr, "\n" "%s: unknown escape sequence '\\%c'!\n", argv0, *start);
+						fprintf(stderr, "%s: unknown escape sequence '\\%c'!\n", argv0, *start);
 						return false;
 				}
 			}
@@ -89,7 +89,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 			int dstfd = openat(zest_dirfd, buffer.data, O_WRONLY | O_TRUNC | O_CREAT, 0664);
 			
 			if (dstfd < 0)
-				fprintf(stderr, "\n" "%s: open(): %m\n", argv0), result = false;
+				fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
 			else if (file->srcpath)
 			{
 				convert(file->srcpath);
@@ -103,11 +103,11 @@ bool run_test(int zest_dirfd, const struct test* test)
 					struct stat statbuf;
 					
 					if (srcfd < 0)
-						fprintf(stderr, "\n" "%s: open(\"%s\"): %m\n", argv0, buffer.data), result = false;
+						fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, buffer.data), result = false;
 					else if (fstat(srcfd, &statbuf) < 0)
-						fprintf(stderr, "\n" "%s: fstat(): %m\n", argv0), result = false;
+						fprintf(stderr, "%s: fstat(): %m\n", argv0), result = false;
 					else if (fchmod(dstfd, statbuf.st_mode) < 0)
-						fprintf(stderr, "\n" "%s: fchmod(): %m\n", argv0), result = false;
+						fprintf(stderr, "%s: fchmod(): %m\n", argv0), result = false;
 					else
 					{
 						char buffer[4096];
@@ -117,13 +117,13 @@ bool run_test(int zest_dirfd, const struct test* test)
 						{
 							if (write(dstfd, buffer, rrettval) != rrettval)
 							{
-								fprintf(stderr, "\n" "%s: write(): %m\n", argv0), result = false;
+								fprintf(stderr, "%s: write(): %m\n", argv0), result = false;
 							}
 						}
 						
 						if (rrettval < 0)
 						{
-							fprintf(stderr, "\n" "%s: read(): %m\n", argv0), result = false;
+							fprintf(stderr, "%s: read(): %m\n", argv0), result = false;
 						}
 					}
 					
@@ -144,7 +144,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 						
 						if (write(dstfd, buffer.data, buffer.n) != buffer.n)
 						{
-							fprintf(stderr, "\n" "%s: write(): %m\n", argv0), result = false;
+							fprintf(stderr, "%s: write(): %m\n", argv0), result = false;
 						}
 					}
 				}
@@ -160,7 +160,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 	
 	if (!ztest->commands)
 	{
-		fprintf(stderr, "\n" "%s: test missing commands!\n", argv0), result = false;
+		fprintf(stderr, "%s: test missing commands!\n", argv0), result = false;
 	}
 	
 	if (result)
@@ -180,32 +180,32 @@ bool run_test(int zest_dirfd, const struct test* test)
 			pid_t child = -1;
 			
 			if ((child = fork()) < 0)
-				fprintf(stderr, "\n" "%s: fork(): %m\n", argv0), result = false;
+				fprintf(stderr, "%s: fork(): %m\n", argv0), result = false;
 			else if (child)
 			{
 				if (waitpid(child, &wstatus, 0) < 0)
-					fprintf(stderr, "\n" "%s: waitpid(): %m\n", argv0), result = false;
+					fprintf(stderr, "%s: waitpid(): %m\n", argv0), result = false;
 				else if (!WIFEXITED(wstatus))
-					fprintf(stderr, "\n" "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
+					fprintf(stderr, "%s: subtask '%s' did not exit normally!\n", argv0, buffer.data), result = false;
 				else
 					code = WEXITSTATUS(wstatus);
 			}
 			else if (fchdir(zest_dirfd) < 0)
-				fprintf(stderr, "\n" "%s: fchdir(): %m\n", argv0), result = false;
+				fprintf(stderr, "%s: fchdir(): %m\n", argv0), result = false;
 			else
 			{
 				int output_fd = open("./output.txt", O_WRONLY | O_TRUNC | O_CREAT, 0664);
 				
 				if (output_fd < 0)
-					fprintf(stderr, "\n" "%s: open(): %m\n", argv0), result = false;
+					fprintf(stderr, "%s: open(): %m\n", argv0), result = false;
 				else if (close(0) < 0)
-					fprintf(stderr, "\n" "%s: close(): %m\n", argv0), result = false;
+					fprintf(stderr, "%s: close(): %m\n", argv0), result = false;
 				else if (dup2(output_fd, 1) < 0)
-					fprintf(stderr, "\n" "%s: dup2(): %m\n", argv0), result = false;
+					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
 				else if (dup2(output_fd, 2) < 0)
-					fprintf(stderr, "\n" "%s: dup2(): %m\n", argv0), result = false;
+					fprintf(stderr, "%s: dup2(): %m\n", argv0), result = false;
 				else if (execvp(cmd[0], cmd) < 0)
-					fprintf(stderr, "\n" "%s: execvp(): %m\n", argv0), result = false;
+					fprintf(stderr, "%s: execvp(): %m\n", argv0), result = false;
 				
 				close(output_fd);
 			}
@@ -213,7 +213,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 		
 		if (code != ztest->code)
 		{
-			fprintf(stderr, "\n" "%s: subtask '%s' did not return expected "
+			fprintf(stderr, "%s: subtask '%s' did not return expected "
 				"exit-code! (expected %u, actual: %u)\n",
 				argv0, buffer.data, ztest->code, code);
 			
