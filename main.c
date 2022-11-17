@@ -40,6 +40,7 @@
 
 #include <store_database.h>
 
+#include <clear_dirfd.h>
 #include <run_test.h>
 
 int main(int argc, char* const* argv)
@@ -121,8 +122,9 @@ int main(int argc, char* const* argv)
 		
 		fflush(stdout);
 		
-		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
+		clear_dirfd(zest_dirfd);
 		
+		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
 		assert(node);
 		
 		is_passing = run_test(zest_dirfd, node->item);

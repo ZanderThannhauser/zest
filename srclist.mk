@@ -19,6 +19,7 @@ srcs += ./avl/rebalance.c
 srcs += ./avl/search.c
 srcs += ./avl/search_closest.c
 srcs += ./avl/unlink_node.c
+srcs += ./clear_dirfd.c
 srcs += ./cmdln/free.c
 srcs += ./cmdln/process.c
 srcs += ./cmdln/usage.c

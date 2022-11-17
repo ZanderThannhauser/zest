@@ -6,4 +6,4 @@ gen/test-build/./main.o: main.c debug.h memory/smalloc.h \
  cmdln/process.h cmdln/free.h parser/parse_files.h test/struct.h \
  test/compare.h test/free.h record/struct.h record/compare.h \
  record/free.h parse_database.h cross_reference.h store_database.h \
- run_test.h
+ clear_dirfd.h run_test.h
