@@ -19,15 +19,20 @@ struct cmdln_flags* cmdln_process(int argc, char* const* argv)
 	}
 	
 	bool verbose = false;
+	bool clear_dirfd = true;
 	
 	int opt;
-	while ((opt = getopt(argc, argv, "hv")) != -1)
+	while ((opt = getopt(argc, argv, "hvD")) != -1)
 	{
 		switch (opt)
 		{
 			case 'v':
 				verbose = true;
 				dpvb(verbose);
+				break;
+			
+			case 'D':
+				clear_dirfd = false;
 				break;
 			
 			case 'h':
@@ -52,9 +57,11 @@ struct cmdln_flags* cmdln_process(int argc, char* const* argv)
 	struct cmdln_flags* flags = smalloc(sizeof(*flags));
 	
 	flags->input_directory = input_directory;
+	flags->clear_dirfd = clear_dirfd;
 	flags->verbose = verbose;
 	
 	dpvs(flags->input_directory);
+	dpvb(flags->clear_dirfd);
 	dpvb(flags->verbose);
 	
 	EXIT;

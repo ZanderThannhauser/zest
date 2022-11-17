@@ -122,7 +122,10 @@ int main(int argc, char* const* argv)
 		
 		fflush(stdout);
 		
-		clear_dirfd(zest_dirfd);
+		if (flags->clear_dirfd)
+		{
+			clear_dirfd(zest_dirfd);
+		}
 		
 		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
 		assert(node);

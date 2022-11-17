@@ -2,6 +2,11 @@
 	"files": {
 		"./zest": "./gen/release-build/zest",
 		
+		"./correct.hex": [
+			"0000000 6261 000a                              ",
+			"0000003",
+		],
+		
 		"./test.json": [
 			"[{",
 				"\"files\": {",
@@ -10,18 +15,14 @@
 					"]",
 				"},",
 				"\"commands\": [",
-					"\"hexdump -v ./input.txt > data.hex\",",
-					"\"diff data.hex ./correct.hex\"",
+					"\"hexdump -v ./input.txt > ./data.hex\",",
+					"\"diff ./data.hex ./correct.hex\"",
 				"]",
 			"}]"
 		],
 		
-		"./correct.hex": [
-			"0000000 6261 000a                              ",
-			"0000003"
-		]
 	},
 	"commands": [
-		"./zest ."
+		"./zest . -D"
 	]
 }]
