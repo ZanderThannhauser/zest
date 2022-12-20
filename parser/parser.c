@@ -905,7 +905,7 @@ void print_token_leaf(struct link* links, enum prefix p, const char* name, struc
 	char escape[10];
 	for (unsigned i = 0, n = token->len; i < n; i++)
 		print_tree_escape(escape, token->data[i]), fputs(escape, stdout);
-	printf("\"\e[0m)\n");
+	printf("\"\e[0m) on line %u\n", token->line);
 }
 
 void print_scanf_leaf(struct link* links, enum prefix p, const char* name, const char* format, ...)
@@ -973,7 +973,7 @@ void print_zebu_$start(struct link* links, enum prefix p, const char* name, stru
 			new->prev = links;
 		break;
 	}
-	printf("\e[34m%s\e[m (\e[36m$start\e[m)\n", name);
+	printf("\e[34m%s\e[m (\e[36m$start\e[m) on line %u through %u\n", name, ptree->startline, ptree->endline);
 	if (ptree->tests.n)
 	{
 		for (unsigned i = 0, n = ptree->tests.n; i < n; i++)
@@ -1014,7 +1014,7 @@ void print_zebu_environment(struct link* links, enum prefix p, const char* name,
 			new->prev = links;
 		break;
 	}
-	printf("\e[34m%s\e[m (\e[36menvironment\e[m)\n", name);
+	printf("\e[34m%s\e[m (\e[36menvironment\e[m) on line %u through %u\n", name, ptree->startline, ptree->endline);
 	if (ptree->variables.n)
 	{
 		for (unsigned i = 0, n = ptree->variables.n; i < n; i++)
@@ -1055,7 +1055,7 @@ void print_zebu_file(struct link* links, enum prefix p, const char* name, struct
 			new->prev = links;
 		break;
 	}
-	printf("\e[34m%s\e[m (\e[36mfile\e[m)\n", name);
+	printf("\e[34m%s\e[m (\e[36mfile\e[m) on line %u through %u\n", name, ptree->startline, ptree->endline);
 	if (ptree->content)
 		print_zebu_text(new ?: links, p_not_last_child, "content", ptree->content);
 	else
@@ -1095,7 +1095,7 @@ void print_zebu_test(struct link* links, enum prefix p, const char* name, struct
 			new->prev = links;
 		break;
 	}
-	printf("\e[34m%s\e[m (\e[36mtest\e[m)\n", name);
+	printf("\e[34m%s\e[m (\e[36mtest\e[m) on line %u through %u\n", name, ptree->startline, ptree->endline);
 	print_scanf_leaf(new ?: links, p_not_last_child, "code", "%u", ptree->code);
 	if (ptree->commands)
 		print_zebu_text(new ?: links, p_not_last_child, "commands", ptree->commands);
@@ -1153,7 +1153,7 @@ void print_zebu_text(struct link* links, enum prefix p, const char* name, struct
 			new->prev = links;
 		break;
 	}
-	printf("\e[34m%s\e[m (\e[36mtext\e[m)\n", name);
+	printf("\e[34m%s\e[m (\e[36mtext\e[m) on line %u through %u\n", name, ptree->startline, ptree->endline);
 	if (ptree->lines.n)
 	{
 		for (unsigned i = 0, n = ptree->lines.n; i < n; i++)
@@ -1194,7 +1194,7 @@ void print_zebu_variable(struct link* links, enum prefix p, const char* name, st
 			new->prev = links;
 		break;
 	}
-	printf("\e[34m%s\e[m (\e[36mvariable\e[m)\n", name);
+	printf("\e[34m%s\e[m (\e[36mvariable\e[m) on line %u through %u\n", name, ptree->startline, ptree->endline);
 	if (ptree->name)
 		print_token_leaf(new ?: links, p_not_last_child, "name", ptree->name);
 	else
@@ -1343,6 +1343,8 @@ void free_zebu_variable(struct zebu_variable* ptree)
 
 
 
+#define argv0 (program_invocation_name)
+
 #define N(array) (sizeof(array) / sizeof(*array))
 
 #ifdef ZEBU_DEBUG
@@ -1364,6 +1366,7 @@ static void escape(char *out, unsigned char in)
 		case '+':
 		case '=':
 		case '|':
+		case '/':
 		case '<': case '>':
 		case '(': case ')':
 		case '{': case '}':
@@ -1371,7 +1374,6 @@ static void escape(char *out, unsigned char in)
 		case ':': case ';':
 		case ',': case '.':
 		case '_':
-		case '/':
 		case '0' ... '9':
 		case 'a' ... 'z':
 		case 'A' ... 'Z':
@@ -1381,6 +1383,8 @@ static void escape(char *out, unsigned char in)
 		
 		case '\\': *out++ = '\\', *out++ = '\\', *out = 0; break;
 		
+		case '\'': *out++ = '\\', *out++ = '\'', *out = 0; break;
+		
 		case '\"': *out++ = '\\', *out++ = '\"', *out = 0; break;
 		
 		case '\t': *out++ = '\\', *out++ = 't', *out = 0; break;
@@ -1388,7 +1392,7 @@ static void escape(char *out, unsigned char in)
 		case '\n': *out++ = '\\', *out++ = 'n', *out = 0; break;
 		
 		default:
-			sprintf(out, "\\x%02X", in);
+			sprintf(out, "\\x%02hhX", in);
 			break;
 	}
 }
@@ -1399,7 +1403,9 @@ struct zebu_$start* zebu_parse(FILE* stream)
 	void* root;
 	struct { unsigned* data, n, cap; } yacc = {};
 	struct { void** data; unsigned n, cap; } data = {};
-	struct { unsigned char* data; unsigned n, cap; } lexer = {};
+	struct { unsigned char* data; unsigned n, cap; unsigned line; } lexer = {
+		.line = 1,
+	};
 	
 	void push_state(unsigned y)
 	{
@@ -1436,26 +1442,28 @@ struct zebu_$start* zebu_parse(FILE* stream)
 	}
 	#endif
 	
+	void push_char(unsigned char c)
+	{
+		while (lexer.n + 1 >= lexer.cap)
+		{
+			lexer.cap = lexer.cap << 1 ?: 1;
+			#ifdef ZEBU_DEBUG
+			ddprintf("lexer.cap == %u\n", lexer.cap);
+			#endif
+			lexer.data = realloc(lexer.data, lexer.cap);
+		}
+		
+		lexer.data[lexer.n++] = c;
+	}
+	
 	unsigned y, t, s, r;
 	void* td;
 	
 	void read_token(unsigned l)
 	{
-		void append(unsigned char c)
-		{
-			while (lexer.n + 1 >= lexer.cap)
-			{
-				lexer.cap = lexer.cap << 1 ?: 1;
-				#ifdef ZEBU_DEBUG
-				ddprintf("lexer.cap == %u\n", lexer.cap);
-				#endif
-				lexer.data = realloc(lexer.data, lexer.cap);
-			}
-			
-			lexer.data[lexer.n++] = c;
-		}
-		
 		unsigned original_l = l, i = 0, a, b, c, f = 0;
+		
+		unsigned line = lexer.line;
 		
 		t = 0;
 		
@@ -1481,7 +1489,7 @@ struct zebu_$start* zebu_parse(FILE* stream)
 			}
 			else if ((c = getc(stream)) != EOF)
 			{
-				append(c);
+				push_char(c);
 				
 				#ifdef ZEBU_DEBUG
 				char escaped[10];
@@ -1514,7 +1522,7 @@ struct zebu_$start* zebu_parse(FILE* stream)
 			{
 				if (b)
 				{
-					l = a, t = b, f = i++;
+					l = a, t = b, f = i++, lexer.line = line;
 					#ifdef ZEBU_DEBUG
 					ddprintf("lexer: l = %u\n", l);
 					#endif
@@ -1526,11 +1534,19 @@ struct zebu_$start* zebu_parse(FILE* stream)
 					ddprintf("lexer: l = %u\n", l);
 					#endif
 				}
+				
+				if (c == '\n')
+				{
+					line++;
+					#ifdef ZEBU_DEBUG
+					ddprintf("lexer: line: %u\n", line);
+					#endif
+				}
 			}
 			else if (b)
 			{
 				#ifdef ZEBU_DEBUG
-				ddprintf("lexer: token: \"%.*s\"\n", i, lexer.data);
+				ddprintf("lexer: token: \"%.*s\", line: %u\n", i, lexer.data, line);
 				#endif
 				
 				if (!lexer.n)
@@ -1547,7 +1563,7 @@ struct zebu_$start* zebu_parse(FILE* stream)
 					ddprintf("lexer: whitespace: \"%.*s\"\n", i, lexer.data);
 					#endif
 					
-					l = original_l, t = 0, f = 0;
+					l = original_l, t = 0, lexer.line = line;
 					memmove(lexer.data, lexer.data + i, lexer.n - i), lexer.n -= i, i = 0;
 				}
 				else
@@ -1558,11 +1574,13 @@ struct zebu_$start* zebu_parse(FILE* stream)
 					
 					struct zebu_token* token = malloc(sizeof(*token));
 					token->refcount = 1;
+					token->line = line;
 					token->data = memcpy(malloc(i + 1), lexer.data, i);
-					token->len = i;
 					token->data[i] = 0;
+					token->len = i;
 					t = b, td = token;
 					
+					lexer.line = line;
 					memmove(lexer.data, lexer.data + i, lexer.n - i), lexer.n -= i;
 					break;
 				}
@@ -1575,7 +1593,7 @@ struct zebu_$start* zebu_parse(FILE* stream)
 					ddprintf("lexer: falling back to whitespace: \"%.*s\"\n", f, lexer.data);
 					#endif
 					
-					l = original_l, t = 0;
+					l = original_l, t = 0, line = lexer.line;
 					memmove(lexer.data, lexer.data + f, lexer.n - f), lexer.n -= f, f = 0, i = 0;
 				}
 				else
@@ -1586,9 +1604,10 @@ struct zebu_$start* zebu_parse(FILE* stream)
 					
 					struct zebu_token* token = malloc(sizeof(*token));
 					token->refcount = 1;
+					token->line = lexer.line;
 					token->data = memcpy(malloc(f + 1), lexer.data, f);
-					token->len = f;
 					token->data[f] = 0;
+					token->len = f;
 					td = token;
 					
 					memmove(lexer.data, lexer.data + f, lexer.n - f), lexer.n -= f, f = 0;
@@ -1597,11 +1616,20 @@ struct zebu_$start* zebu_parse(FILE* stream)
 			}
 			else
 			{
-				if (c == (unsigned) EOF)
-					fprintf(stderr, "zebu: unexpected '<EOF>' when reading '%.*s'!\n", i, lexer.data);
+				if (i != 0)
+				{
+					if (c == (unsigned) EOF)
+						fprintf(stderr, "%s: unexpected '<EOF>' when reading '%.*s' on line %u!\n", argv0, i, lexer.data, line);
+					else
+						fprintf(stderr, "%s: unexpected '%c' when reading '%.*s' on line %u!\n", argv0, c, i, lexer.data, line);
+				}
 				else
-					fprintf(stderr, "zebu: unexpected '%c' when reading '%.*s'!\n", c, i, lexer.data);
-				
+				{
+					if (c == (unsigned) EOF)
+						fprintf(stderr, "%s: unexpected '<EOF>' on line %u!\n", argv0, line);
+					else
+						fprintf(stderr, "%s: unexpected '%c' on line %u!\n", argv0, c, line);
+				}
 				exit(1);
 			}
 		}
@@ -1643,1371 +1671,1661 @@ struct zebu_$start* zebu_parse(FILE* stream)
 	case 2:
 	{
 		struct zebu_$start* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_$start* trie = data.data[--yacc.n, --data.n];
-			if (trie->tests.n)
-			{
-				while (value->tests.n + trie->tests.n > value->tests.cap)
-				{
-					value->tests.cap = value->tests.cap << 1 ?: 1;
-					value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
-				}
-				memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
-				for (unsigned i = 0, n = trie->tests.n; i < n; i++)
-					value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
-				value->tests.n += trie->tests.n;
-			}
-			free_zebu_$start(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_$start* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->tests.n)
+{
+while (value->tests.n + trie->tests.n > value->tests.cap)
+{
+value->tests.cap = value->tests.cap << 1 ?: 1;
+value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
+}
+memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
+for (unsigned i = 0, n = trie->tests.n; i < n; i++)
+value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
+value->tests.n += trie->tests.n;
+}
+free_zebu_$start(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 22;
 		break;
 	}
 	case 1:
 	{
 		struct zebu_$start* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 1;
 		break;
 	}
 	case 6:
 	{
 		struct zebu_$start* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_$start* trie = data.data[--yacc.n, --data.n];
-			if (trie->tests.n)
-			{
-				while (value->tests.n + trie->tests.n > value->tests.cap)
-				{
-					value->tests.cap = value->tests.cap << 1 ?: 1;
-					value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
-				}
-				memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
-				for (unsigned i = 0, n = trie->tests.n; i < n; i++)
-					value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
-				value->tests.n += trie->tests.n;
-			}
-			free_zebu_$start(trie);
-		}
-		{
-		struct zebu_test* subgrammar = data.data[--yacc.n, --data.n];
-		if (value->tests.n == value->tests.cap)
-		{
-			value->tests.cap = value->tests.cap << 1 ?: 1;
-			value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
-		}
-		memmove(value->tests.data + 1, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
-		value->tests.data[0] = inc_zebu_test(subgrammar), value->tests.n++;
-		free_zebu_test(subgrammar);
-		}
+{
+struct zebu_$start* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->tests.n)
+{
+while (value->tests.n + trie->tests.n > value->tests.cap)
+{
+value->tests.cap = value->tests.cap << 1 ?: 1;
+value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
+}
+memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
+for (unsigned i = 0, n = trie->tests.n; i < n; i++)
+value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
+value->tests.n += trie->tests.n;
+}
+free_zebu_$start(trie);
+}
+{
+struct zebu_test* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+if (value->tests.n == value->tests.cap)
+{
+value->tests.cap = value->tests.cap << 1 ?: 1;
+value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
+}
+memmove(value->tests.data + 1, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
+value->tests.data[0] = inc_zebu_test(subgrammar), value->tests.n++;
+free_zebu_test(subgrammar);
+}
 		d = value, g = 1;
 		break;
 	}
 	case 14:
 	{
 		struct zebu_$start* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_$start* trie = data.data[--yacc.n, --data.n];
-			if (trie->tests.n)
-			{
-				while (value->tests.n + trie->tests.n > value->tests.cap)
-				{
-					value->tests.cap = value->tests.cap << 1 ?: 1;
-					value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
-				}
-				memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
-				for (unsigned i = 0, n = trie->tests.n; i < n; i++)
-					value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
-				value->tests.n += trie->tests.n;
-			}
-			free_zebu_$start(trie);
-		}
-		{
-		struct zebu_test* subgrammar = data.data[--yacc.n, --data.n];
-		if (value->tests.n == value->tests.cap)
-		{
-			value->tests.cap = value->tests.cap << 1 ?: 1;
-			value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
-		}
-		memmove(value->tests.data + 1, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
-		value->tests.data[0] = inc_zebu_test(subgrammar), value->tests.n++;
-		free_zebu_test(subgrammar);
-		}
+{
+struct zebu_$start* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->tests.n)
+{
+while (value->tests.n + trie->tests.n > value->tests.cap)
+{
+value->tests.cap = value->tests.cap << 1 ?: 1;
+value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
+}
+memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
+for (unsigned i = 0, n = trie->tests.n; i < n; i++)
+value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
+value->tests.n += trie->tests.n;
+}
+free_zebu_$start(trie);
+}
+{
+struct zebu_test* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+if (value->tests.n == value->tests.cap)
+{
+value->tests.cap = value->tests.cap << 1 ?: 1;
+value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
+}
+memmove(value->tests.data + 1, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
+value->tests.data[0] = inc_zebu_test(subgrammar), value->tests.n++;
+free_zebu_test(subgrammar);
+}
 		d = value, g = 4;
 		break;
 	}
 	case 13:
 	{
 		struct zebu_$start* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_$start* trie = data.data[--yacc.n, --data.n];
-			if (trie->tests.n)
-			{
-				while (value->tests.n + trie->tests.n > value->tests.cap)
-				{
-					value->tests.cap = value->tests.cap << 1 ?: 1;
-					value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
-				}
-				memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
-				for (unsigned i = 0, n = trie->tests.n; i < n; i++)
-					value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
-				value->tests.n += trie->tests.n;
-			}
-			free_zebu_$start(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_$start* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->tests.n)
+{
+while (value->tests.n + trie->tests.n > value->tests.cap)
+{
+value->tests.cap = value->tests.cap << 1 ?: 1;
+value->tests.data = realloc(value->tests.data, sizeof(*value->tests.data) * value->tests.cap);
+}
+memmove(value->tests.data + trie->tests.n, value->tests.data, sizeof(*value->tests.data) * value->tests.n);
+for (unsigned i = 0, n = trie->tests.n; i < n; i++)
+value->tests.data[i] = inc_zebu_test(trie->tests.data[i]);
+value->tests.n += trie->tests.n;
+}
+free_zebu_$start(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 4;
 		break;
 	}
 	case 5:
 	{
 		struct zebu_$start* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 4;
 		break;
 	}
 	case 24:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
-		free_zebu_text(value->output), value->output = inc_zebu_text(subgrammar);
-		free_zebu_text(subgrammar);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+free_zebu_text(value->output), value->output = inc_zebu_text(subgrammar);
+free_zebu_text(subgrammar);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 9;
 		break;
 	}
 	case 25:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		{
-			char *m;
-			errno = 0;
-			unsigned long raw = strtoul((char*) token->data, &m, 10);
-			if (*m) {
-				fprintf(stderr, "%s: strtoul('%s'): invalid character '%c'!\n", program_invocation_name, token->data, *m);
-				exit(1);
-			} else if (errno) {
-				fprintf(stderr, "%s: strtoul('%s'): %m!\n", program_invocation_name, token->data);
-				exit(1);
-			} else if (raw >= UINT_MAX) {
-				fprintf(stderr, "%s: %%o scanf-token given a value too high for an unsigned int!\n", program_invocation_name);
-				exit(1);
-			}
-			value->code = raw;
-		}
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+{
+char *m;
+errno = 0;
+unsigned long raw = strtoul((char*) token->data, &m, 10);
+if (*m) {
+fprintf(stderr, "%s: strtoul('%s'): invalid character '%c'!\n", program_invocation_name, token->data, *m);
+exit(1);
+} else if (errno) {
+fprintf(stderr, "%s: strtoul('%s'): %m!\n", program_invocation_name, token->data);
+exit(1);
+} else if (raw >= UINT_MAX) {
+fprintf(stderr, "%s: %%o scanf-token given a value too high for an unsigned int!\n", program_invocation_name);
+exit(1);
+}
+value->code = raw;
+}
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 10;
 		break;
 	}
 	case 26:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 13;
 		break;
 	}
 	case 27:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_file* subgrammar = data.data[--yacc.n, --data.n];
-		if (value->files.n == value->files.cap)
-		{
-			value->files.cap = value->files.cap << 1 ?: 1;
-			value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-		}
-		memmove(value->files.data + 1, value->files.data, sizeof(*value->files.data) * value->files.n);
-		value->files.data[0] = inc_zebu_file(subgrammar), value->files.n++;
-		free_zebu_file(subgrammar);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_file* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+if (value->files.n == value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + 1, value->files.data, sizeof(*value->files.data) * value->files.n);
+value->files.data[0] = inc_zebu_file(subgrammar), value->files.n++;
+free_zebu_file(subgrammar);
+}
 		d = value, g = 13;
 		break;
 	}
 	case 43:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_file* subgrammar = data.data[--yacc.n, --data.n];
-		if (value->files.n == value->files.cap)
-		{
-			value->files.cap = value->files.cap << 1 ?: 1;
-			value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-		}
-		memmove(value->files.data + 1, value->files.data, sizeof(*value->files.data) * value->files.n);
-		value->files.data[0] = inc_zebu_file(subgrammar), value->files.n++;
-		free_zebu_file(subgrammar);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_file* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+if (value->files.n == value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + 1, value->files.data, sizeof(*value->files.data) * value->files.n);
+value->files.data[0] = inc_zebu_file(subgrammar), value->files.n++;
+free_zebu_file(subgrammar);
+}
 		d = value, g = 19;
 		break;
 	}
 	case 41:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 19;
 		break;
 	}
 	case 42:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 19;
 		break;
 	}
 	case 44:
 	{
 		struct zebu_text* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_text* trie = data.data[--yacc.n, --data.n];
-			if (trie->lines.n)			{
-				while (value->lines.n + trie->lines.n > value->lines.cap)
-				{
-					value->lines.cap = value->lines.cap << 1 ?: 1;
-					value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
-				}
-				memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
-				for (unsigned i = 0, n = trie->lines.n; i < n; i++)
-					value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
-				value->lines.n += trie->lines.n;
-			}
-			free_zebu_text(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		if (value->lines.n == value->lines.cap)
-		{
-			value->lines.cap = value->lines.cap << 1 ?: 1;
-			value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
-		}
-		memmove(value->lines.data + 1, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
-		value->lines.data[0] = inc_zebu_token(token), value->lines.n++;
-		free_zebu_token(token);
-		}
+{
+struct zebu_text* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->lines.n){
+while (value->lines.n + trie->lines.n > value->lines.cap)
+{
+value->lines.cap = value->lines.cap << 1 ?: 1;
+value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
+}
+memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
+for (unsigned i = 0, n = trie->lines.n; i < n; i++)
+value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
+value->lines.n += trie->lines.n;
+}
+free_zebu_text(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+if (value->lines.n == value->lines.cap)
+{
+value->lines.cap = value->lines.cap << 1 ?: 1;
+value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
+}
+memmove(value->lines.data + 1, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
+value->lines.data[0] = inc_zebu_token(token), value->lines.n++;
+free_zebu_token(token);
+}
 		d = value, g = 20;
 		break;
 	}
 	case 45:
 	{
 		struct zebu_text* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_text* trie = data.data[--yacc.n, --data.n];
-			if (trie->lines.n)			{
-				while (value->lines.n + trie->lines.n > value->lines.cap)
-				{
-					value->lines.cap = value->lines.cap << 1 ?: 1;
-					value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
-				}
-				memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
-				for (unsigned i = 0, n = trie->lines.n; i < n; i++)
-					value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
-				value->lines.n += trie->lines.n;
-			}
-			free_zebu_text(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_text* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->lines.n){
+while (value->lines.n + trie->lines.n > value->lines.cap)
+{
+value->lines.cap = value->lines.cap << 1 ?: 1;
+value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
+}
+memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
+for (unsigned i = 0, n = trie->lines.n; i < n; i++)
+value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
+value->lines.n += trie->lines.n;
+}
+free_zebu_text(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 20;
 		break;
 	}
 	case 28:
 	{
 		struct zebu_text* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 20;
 		break;
 	}
 	case 29:
 	{
 		struct zebu_text* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_text* trie = data.data[--yacc.n, --data.n];
-			if (trie->lines.n)			{
-				while (value->lines.n + trie->lines.n > value->lines.cap)
-				{
-					value->lines.cap = value->lines.cap << 1 ?: 1;
-					value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
-				}
-				memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
-				for (unsigned i = 0, n = trie->lines.n; i < n; i++)
-					value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
-				value->lines.n += trie->lines.n;
-			}
-			free_zebu_text(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		if (value->lines.n == value->lines.cap)
-		{
-			value->lines.cap = value->lines.cap << 1 ?: 1;
-			value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
-		}
-		memmove(value->lines.data + 1, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
-		value->lines.data[0] = inc_zebu_token(token), value->lines.n++;
-		free_zebu_token(token);
-		}
+{
+struct zebu_text* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->lines.n){
+while (value->lines.n + trie->lines.n > value->lines.cap)
+{
+value->lines.cap = value->lines.cap << 1 ?: 1;
+value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
+}
+memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
+for (unsigned i = 0, n = trie->lines.n; i < n; i++)
+value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
+value->lines.n += trie->lines.n;
+}
+free_zebu_text(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+if (value->lines.n == value->lines.cap)
+{
+value->lines.cap = value->lines.cap << 1 ?: 1;
+value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
+}
+memmove(value->lines.data + 1, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
+value->lines.data[0] = inc_zebu_token(token), value->lines.n++;
+free_zebu_token(token);
+}
 		d = value, g = 15;
 		break;
 	}
 	case 16:
 	{
 		struct zebu_text* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 15;
 		break;
 	}
 	case 38:
 	{
 		struct zebu_environment* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_environment* trie = data.data[--yacc.n, --data.n];
-			if (trie->variables.n)
-			{
-				while (value->variables.n + trie->variables.n > value->variables.cap)
-				{
-					value->variables.cap = value->variables.cap << 1 ?: 1;
-					value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
-				}
-				memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
-				for (unsigned i = 0, n = trie->variables.n; i < n; i++)
-					value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
-				value->variables.n += trie->variables.n;
-			}
-			free_zebu_environment(trie);
-		}
-		{
-		struct zebu_variable* subgrammar = data.data[--yacc.n, --data.n];
-		if (value->variables.n == value->variables.cap)
-		{
-			value->variables.cap = value->variables.cap << 1 ?: 1;
-			value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
-		}
-		memmove(value->variables.data + 1, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
-		value->variables.data[0] = inc_zebu_variable(subgrammar), value->variables.n++;
-		free_zebu_variable(subgrammar);
-		}
+{
+struct zebu_environment* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->variables.n)
+{
+while (value->variables.n + trie->variables.n > value->variables.cap)
+{
+value->variables.cap = value->variables.cap << 1 ?: 1;
+value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
+}
+memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
+for (unsigned i = 0, n = trie->variables.n; i < n; i++)
+value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
+value->variables.n += trie->variables.n;
+}
+free_zebu_environment(trie);
+}
+{
+struct zebu_variable* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+if (value->variables.n == value->variables.cap)
+{
+value->variables.cap = value->variables.cap << 1 ?: 1;
+value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
+}
+memmove(value->variables.data + 1, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
+value->variables.data[0] = inc_zebu_variable(subgrammar), value->variables.n++;
+free_zebu_variable(subgrammar);
+}
 		d = value, g = 17;
 		break;
 	}
 	case 20:
 	{
 		struct zebu_environment* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 17;
 		break;
 	}
 	case 47:
 	{
 		struct zebu_environment* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_environment* trie = data.data[--yacc.n, --data.n];
-			if (trie->variables.n)
-			{
-				while (value->variables.n + trie->variables.n > value->variables.cap)
-				{
-					value->variables.cap = value->variables.cap << 1 ?: 1;
-					value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
-				}
-				memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
-				for (unsigned i = 0, n = trie->variables.n; i < n; i++)
-					value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
-				value->variables.n += trie->variables.n;
-			}
-			free_zebu_environment(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_environment* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->variables.n)
+{
+while (value->variables.n + trie->variables.n > value->variables.cap)
+{
+value->variables.cap = value->variables.cap << 1 ?: 1;
+value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
+}
+memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
+for (unsigned i = 0, n = trie->variables.n; i < n; i++)
+value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
+value->variables.n += trie->variables.n;
+}
+free_zebu_environment(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 21;
 		break;
 	}
 	case 37:
 	{
 		struct zebu_environment* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 21;
 		break;
 	}
 	case 48:
 	{
 		struct zebu_environment* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_environment* trie = data.data[--yacc.n, --data.n];
-			if (trie->variables.n)
-			{
-				while (value->variables.n + trie->variables.n > value->variables.cap)
-				{
-					value->variables.cap = value->variables.cap << 1 ?: 1;
-					value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
-				}
-				memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
-				for (unsigned i = 0, n = trie->variables.n; i < n; i++)
-					value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
-				value->variables.n += trie->variables.n;
-			}
-			free_zebu_environment(trie);
-		}
-		{
-		struct zebu_variable* subgrammar = data.data[--yacc.n, --data.n];
-		if (value->variables.n == value->variables.cap)
-		{
-			value->variables.cap = value->variables.cap << 1 ?: 1;
-			value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
-		}
-		memmove(value->variables.data + 1, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
-		value->variables.data[0] = inc_zebu_variable(subgrammar), value->variables.n++;
-		free_zebu_variable(subgrammar);
-		}
+{
+struct zebu_environment* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->variables.n)
+{
+while (value->variables.n + trie->variables.n > value->variables.cap)
+{
+value->variables.cap = value->variables.cap << 1 ?: 1;
+value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
+}
+memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
+for (unsigned i = 0, n = trie->variables.n; i < n; i++)
+value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
+value->variables.n += trie->variables.n;
+}
+free_zebu_environment(trie);
+}
+{
+struct zebu_variable* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+if (value->variables.n == value->variables.cap)
+{
+value->variables.cap = value->variables.cap << 1 ?: 1;
+value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
+}
+memmove(value->variables.data + 1, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
+value->variables.data[0] = inc_zebu_variable(subgrammar), value->variables.n++;
+free_zebu_variable(subgrammar);
+}
 		d = value, g = 21;
 		break;
 	}
 	case 18:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 33:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 30:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 34:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 31:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 32:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 35:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 36:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 16;
 		break;
 	}
 	case 8:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 10:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 9:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 11:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 12:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 3:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 7:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 3;
 		break;
 	}
 	case 15:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 5;
 		break;
 	}
 	case 19:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
-		free_zebu_text(value->commands), value->commands = inc_zebu_text(subgrammar);
-		free_zebu_text(subgrammar);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+free_zebu_text(value->commands), value->commands = inc_zebu_text(subgrammar);
+free_zebu_text(subgrammar);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 6;
 		break;
 	}
 	case 22:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_environment* subgrammar = data.data[--yacc.n, --data.n];
-		free_zebu_environment(value->environment), value->environment = inc_zebu_environment(subgrammar);
-		free_zebu_environment(subgrammar);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_environment* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+free_zebu_environment(value->environment), value->environment = inc_zebu_environment(subgrammar);
+free_zebu_environment(subgrammar);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 7;
 		break;
 	}
 	case 23:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
-		free_zebu_text(value->input), value->input = inc_zebu_text(subgrammar);
-		free_zebu_text(subgrammar);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+free_zebu_text(value->input), value->input = inc_zebu_text(subgrammar);
+free_zebu_text(subgrammar);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 8;
 		break;
 	}
 	case 21:
 	{
 		struct zebu_environment* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_environment* trie = data.data[--yacc.n, --data.n];
-			if (trie->variables.n)
-			{
-				while (value->variables.n + trie->variables.n > value->variables.cap)
-				{
-					value->variables.cap = value->variables.cap << 1 ?: 1;
-					value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
-				}
-				memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
-				for (unsigned i = 0, n = trie->variables.n; i < n; i++)
-					value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
-				value->variables.n += trie->variables.n;
-			}
-			free_zebu_environment(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_environment* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->variables.n)
+{
+while (value->variables.n + trie->variables.n > value->variables.cap)
+{
+value->variables.cap = value->variables.cap << 1 ?: 1;
+value->variables.data = realloc(value->variables.data, sizeof(*value->variables.data) * value->variables.cap);
+}
+memmove(value->variables.data + trie->variables.n, value->variables.data, sizeof(*value->variables.data) * value->variables.n);
+for (unsigned i = 0, n = trie->variables.n; i < n; i++)
+value->variables.data[i] = inc_zebu_variable(trie->variables.data[i]);
+value->variables.n += trie->variables.n;
+}
+free_zebu_environment(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 12;
 		break;
 	}
 	case 39:
 	{
 		struct zebu_file* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(value->srcpath), value->srcpath = inc_zebu_token(token);
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(value->path), value->path = inc_zebu_token(token);
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(value->srcpath), value->srcpath = inc_zebu_token(token);
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(value->path), value->path = inc_zebu_token(token);
+free_zebu_token(token);
+}
 		d = value, g = 14;
 		break;
 	}
 	case 40:
 	{
 		struct zebu_file* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
-		free_zebu_text(value->content), value->content = inc_zebu_text(subgrammar);
-		free_zebu_text(subgrammar);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(value->path), value->path = inc_zebu_token(token);
-		free_zebu_token(token);
-		}
+{
+struct zebu_text* subgrammar = data.data[--yacc.n, --data.n];
+if (subgrammar->startline < value->startline) value->startline = subgrammar->startline;
+if (value->endline < subgrammar->endline) value->endline = subgrammar->endline;
+free_zebu_text(value->content), value->content = inc_zebu_text(subgrammar);
+free_zebu_text(subgrammar);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(value->path), value->path = inc_zebu_token(token);
+free_zebu_token(token);
+}
 		d = value, g = 14;
 		break;
 	}
 	case 4:
 	{
 		struct zebu_test* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_test* trie = data.data[--yacc.n, --data.n];
-			if (trie->code) { value->code = trie->code; }
-			if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
-			if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
-			if (trie->files.n)
-			{
-				while (value->files.n + trie->files.n > value->files.cap)
-				{
-					value->files.cap = value->files.cap << 1 ?: 1;
-					value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
-				}
-				memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
-				for (unsigned i = 0, n = trie->files.n; i < n; i++)
-					value->files.data[i] = inc_zebu_file(trie->files.data[i]);
-				value->files.n += trie->files.n;
-			}
-			if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
-			if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
-			free_zebu_test(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_test* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->code) { value->code = trie->code; }
+if (trie->commands) { free_zebu_text(value->commands); value->commands = inc_zebu_text(trie->commands); }
+if (trie->environment) { free_zebu_environment(value->environment); value->environment = inc_zebu_environment(trie->environment); }
+if (trie->files.n)
+{
+while (value->files.n + trie->files.n > value->files.cap)
+{
+value->files.cap = value->files.cap << 1 ?: 1;
+value->files.data = realloc(value->files.data, sizeof(*value->files.data) * value->files.cap);
+}
+memmove(value->files.data + trie->files.n, value->files.data, sizeof(*value->files.data) * value->files.n);
+for (unsigned i = 0, n = trie->files.n; i < n; i++)
+value->files.data[i] = inc_zebu_file(trie->files.data[i]);
+value->files.n += trie->files.n;
+}
+if (trie->input) { free_zebu_text(value->input); value->input = inc_zebu_text(trie->input); }
+if (trie->output) { free_zebu_text(value->output); value->output = inc_zebu_text(trie->output); }
+free_zebu_test(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 2;
 		break;
 	}
 	case 17:
 	{
 		struct zebu_text* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-			struct zebu_text* trie = data.data[--yacc.n, --data.n];
-			if (trie->lines.n)			{
-				while (value->lines.n + trie->lines.n > value->lines.cap)
-				{
-					value->lines.cap = value->lines.cap << 1 ?: 1;
-					value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
-				}
-				memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
-				for (unsigned i = 0, n = trie->lines.n; i < n; i++)
-					value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
-				value->lines.n += trie->lines.n;
-			}
-			free_zebu_text(trie);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
+{
+struct zebu_text* trie = data.data[--yacc.n, --data.n];
+if (trie->startline < value->startline) value->startline = trie->startline;
+if (value->endline < trie->endline) value->endline = trie->endline;
+if (trie->lines.n){
+while (value->lines.n + trie->lines.n > value->lines.cap)
+{
+value->lines.cap = value->lines.cap << 1 ?: 1;
+value->lines.data = realloc(value->lines.data, sizeof(*value->lines.data) * value->lines.cap);
+}
+memmove(value->lines.data + trie->lines.n, value->lines.data, sizeof(*value->lines.data) * value->lines.n);
+for (unsigned i = 0, n = trie->lines.n; i < n; i++)
+value->lines.data[i] = inc_zebu_token(trie->lines.data[i]);
+value->lines.n += trie->lines.n;
+}
+free_zebu_text(trie);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
 		d = value, g = 11;
 		break;
 	}
 	case 46:
 	{
 		struct zebu_variable* value = memset(malloc(sizeof(*value)), 0, sizeof(*value));
+		value->startline = -1;
+		value->endline = 0;
 		value->refcount = 1;
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(value->value), value->value = inc_zebu_token(token);
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(token);
-		}
-		{
-		struct zebu_token* token = data.data[--yacc.n, --data.n];
-		free_zebu_token(value->name), value->name = inc_zebu_token(token);
-		free_zebu_token(token);
-		}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(value->value), value->value = inc_zebu_token(token);
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(token);
+}
+{
+struct zebu_token* token = data.data[--yacc.n, --data.n];
+if (token->line < value->startline) value->startline = token->line;
+if (value->endline < token->line) value->endline = token->line;
+free_zebu_token(value->name), value->name = inc_zebu_token(token);
+free_zebu_token(token);
+}
 		d = value, g = 18;
 		break;
 	}

@@ -4,7 +4,7 @@
 struct zebu_token
 {
 	unsigned char* data;
-	unsigned len, refcount;
+	unsigned len, refcount, line;
 };
 
 struct zebu_$start
@@ -13,7 +13,7 @@ struct zebu_$start
 		struct zebu_test** data;
 		unsigned n, cap;
 	} tests;
-	unsigned refcount;
+	unsigned refcount, startline, endline;
 };
 
 struct zebu_environment
@@ -22,7 +22,7 @@ struct zebu_environment
 		struct zebu_variable** data;
 		unsigned n, cap;
 	} variables;
-	unsigned refcount;
+	unsigned refcount, startline, endline;
 };
 
 struct zebu_file
@@ -30,7 +30,7 @@ struct zebu_file
 	struct zebu_text* content;
 	struct zebu_token* path;
 	struct zebu_token* srcpath;
-	unsigned refcount;
+	unsigned refcount, startline, endline;
 };
 
 struct zebu_test
@@ -44,7 +44,7 @@ struct zebu_test
 	} files;
 	struct zebu_text* input;
 	struct zebu_text* output;
-	unsigned refcount;
+	unsigned refcount, startline, endline;
 };
 
 struct zebu_text
@@ -53,14 +53,14 @@ struct zebu_text
 		struct zebu_token** data;
 		unsigned n, cap;
 	} lines;
-	unsigned refcount;
+	unsigned refcount, startline, endline;
 };
 
 struct zebu_variable
 {
 	struct zebu_token* name;
 	struct zebu_token* value;
-	unsigned refcount;
+	unsigned refcount, startline, endline;
 };
 
 
