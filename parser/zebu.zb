@@ -1,5 +1,5 @@
 
-%skip: ' ' | '\t' | '\n';
+%skip: ' ' | '\t' | '\n' | "//" [!'\n']* '\n';
 
 `string`: '\"' ([!('\\', '\"')] | '\\' ['\"', 'n', 't', '\\'])* '\"';
 
@@ -8,7 +8,7 @@
 file: `string` #path ":" expression ';';
 
 primary_expression
-	: '(' expression ')'
+	: '(' expression #sub ')'
 	| `string` #string
 	| `integer` #integer
 	;
@@ -23,37 +23,37 @@ complex_command:
 	;
 
 prefix_expression
-	: primary_expression
-	| "file" "(" expression ")"
-	| "shell" "(" complex_command ")"
+	: primary_expression #inner
+	| "file" "(" expression #file ")"
+	| "shell" "(" complex_command #shell ")"
 	;
 
 multiplicative_expression
-	: prefix_expression
-	| prefix_expression '*' multiplicative_expression
-	| prefix_expression '/' multiplicative_expression
+	: prefix_expression #inner
+	| multiplicative_expression #left '*' prefix_expression #right
+	| multiplicative_expression #left '/' prefix_expression #right
 	;
 
 additive_expression
-	: multiplicative_expression
-	| multiplicative_expression '+' multiplicative_expression
-	| multiplicative_expression '-' multiplicative_expression
+	: multiplicative_expression #inner
+	| additive_expression #left '+' multiplicative_expression #right
+	| additive_expression #left '-' multiplicative_expression #right
 	;
 
 equality_expression
-	: additive_expression
-	| additive_expression "==" equality_expression
-	| additive_expression "!=" equality_expression
+	: additive_expression #inner
+	| equality_expression #left "==" additive_expression #right
+	| equality_expression #left "!=" additive_expression #right
 	;
 
 ternary_expression
-	: equality_expression
-	| equality_expression '?' expression ':' ternary_expression
+	: equality_expression #inner
+	| equality_expression #inner '?' expression #truecase ':' ternary_expression #falsecase
 	;
 
-expression: ternary_expression;
+expression: ternary_expression #inner;
 
-assertion: expression;
+assertion: expression #conditional ';';
 
 test: (file #files[] | assertion #assertions[])*;
 
