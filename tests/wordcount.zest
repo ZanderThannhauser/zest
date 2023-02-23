@@ -1,0 +1,29 @@
+
+
+"./wc":
+	file("/tmp/wc");
+
+"./text.txt": ""
+	+ "abc" + "\n"
+	+ "def" + "\n"
+	+ "ghi" + "\n";
+
+shell("./wc" "-l" < "./test.txt" > "./stdout.txt") == 0;
+
+file("./stdout.txt") == "3";
+
+
+---
+
+
+"./wc":
+	file("/tmp/wc");
+
+shell("./wc" "-l" "./test.txt" >2 "./stderr.txt") == 1;
+
+file("./stderr.txt") == "wc: blah: No such file or directory\n";
+
+
+
+
+

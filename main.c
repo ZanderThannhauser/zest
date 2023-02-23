@@ -1,58 +1,65 @@
 
-#include <string.h>
-#include <unistd.h>
-#include <assert.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+/*#include <defines/argv0.h>*/
+/*#include <defines/DATABASE_PATH.h>*/
+/*#include <defines/AGILITY.h>*/
+
+/*#include <enums/error.h>*/
+
+/*#include <avl/alloc_tree.h>*/
+/*#include <avl/search.h>*/
+/*#include <avl/free_tree.h>*/
+
+/*#include <parser/parse_files.h>*/
+
+/*#include <test/struct.h>*/
+
+/*#include <record/struct.h>*/
+/*#include <record/compare.h>*/
+/*#include <record/free.h>*/
+
+/*#include <parse_database.h>*/
+
+/*#include <cross_reference.h>*/
+
+/*#include <store_database.h>*/
+
+/*#include <clear_dirfd.h>*/
+/*#include <run_test.h>*/
+
+/*#include <string.h>*/
+/*#include <unistd.h>*/
+/*#include <assert.h>*/
+/*#include <fcntl.h>*/
+/*#include <stdlib.h>*/
+/*#include <stdio.h>*/
+/*#include <sys/stat.h>*/
+/*#include <sys/types.h>*/
 
 #include <debug.h>
 
-#include <defines/argv0.h>
-#include <defines/DATABASE_PATH.h>
-#include <defines/AGILITY.h>
-
-#include <enums/error.h>
-
-#include <avl/alloc_tree.h>
-#include <avl/search.h>
-#include <avl/free_tree.h>
-
-#include <cmdln/flags.h>
 #include <cmdln/process.h>
-#include <cmdln/free.h>
+#include <cmdln/test_paths.h>
 
-#include <parser/parse_files.h>
-
-#include <test/struct.h>
 #include <test/compare.h>
 #include <test/free.h>
 
-#include <record/struct.h>
-#include <record/compare.h>
-#include <record/free.h>
-
-#include <parse_database.h>
-
-#include <cross_reference.h>
-
-#include <store_database.h>
-
-#include <clear_dirfd.h>
-#include <run_test.h>
+#include <parser/find_tests.h>
 
 int main(int argc, char* const* argv)
 {
 	ENTER;
 	
-	struct cmdln_flags* flags = cmdln_process(argc, argv);
+	cmdln_process(argc, argv);
 	
 	struct avl_tree_t* tests = avl_alloc_tree(compare_tests, free_test);
 	
-	parse_files(tests, flags->input_directory);
+	for (char* test_path; (test_path = *test_paths++); )
+	{
+		find_tests(tests, test_path);
+	}
 	
+	TODO;
+	#if 0
 	struct avl_tree_t* records = avl_alloc_tree(compare_records, free_record);
 	
 	parse_database(records, DATABASE_PATH);
@@ -122,20 +129,25 @@ int main(int argc, char* const* argv)
 		
 		fflush(stdout);
 		
-		if (flags->clear_dirfd)
-		{
-			clear_dirfd(zest_dirfd);
-		}
-		
 		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
 		assert(node);
 		
+		clear_dirfd(zest_dirfd);
+		
+		// write files
+		
+		// fork:
+			// chroot
+			// for each command:
+				// parse and exec
+		// else: waitpid
+		
+		TODO;
+		#if 0
 		is_passing = run_test(zest_dirfd, node->item);
 		
-		if (is_passing)
-			record->score = (1 + record->score * (AGILITY - 1)) / AGILITY;
-		else
-			record->score = (0 + record->score * (AGILITY - 1)) / AGILITY;
+		record->score = (is_passing + record->score * (AGILITY - 1)) / AGILITY;
+		#endif
 	}
 	
 	if (is_passing)
@@ -159,6 +171,7 @@ int main(int argc, char* const* argv)
 	
 	EXIT;
 	return is_passing ? 0 : e_failed_test;
+	#endif
 }
 
 

@@ -1,21 +1,21 @@
 
-#include <assert.h>
-#include <stdbool.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+/*#include <assert.h>*/
+/*#include <stdbool.h>*/
+/*#include <sys/types.h>*/
+/*#include <sys/wait.h>*/
+/*#include <stdlib.h>*/
+/*#include <sys/types.h>*/
+/*#include <sys/stat.h>*/
+/*#include <fcntl.h>*/
+/*#include <unistd.h>*/
 
 #include <debug.h>
 
-#include <defines/argv0.h>
+/*#include <defines/argv0.h>*/
 
-#include <test/struct.h>
+/*#include <test/struct.h>*/
 
-#include <parser/parser.h>
+/*#include <parser/parser.h>*/
 
 #include "run_test.h"
 
@@ -24,6 +24,8 @@ bool run_test(int zest_dirfd, const struct test* test)
 	bool result = true;
 	ENTER;
 	
+	TODO;
+	#if 0
 	dpv(zest_dirfd);
 	dpvs(test->path);
 	
@@ -228,6 +230,7 @@ bool run_test(int zest_dirfd, const struct test* test)
 	
 	EXIT;
 	return result;
+	#endif
 }
 
 

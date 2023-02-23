@@ -1,0 +1,24 @@
+[{
+	files: {
+		"./zest":
+			file("./gen/release-build/zest"),
+		
+		"./test.json":
+			lines(["[{",
+				
+				"commands: [",
+					"[\"true\"],",
+					"[\"false\"],",
+				"]",
+				
+				"exitcode: 1",
+			"}]"]),
+	},
+	
+	commands: [
+		shell("./zest" "."),
+		equals("
+	],
+	
+	exitcode: 0,
+}]

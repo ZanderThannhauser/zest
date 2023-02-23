@@ -97,8 +97,8 @@ objs := $(patsubst %.S,$(buildprefix)/%.o,$(objs))
 deps := $(patsubst %.c,$(depprefix)/%.d,$(srcs))
 deps := $(patsubst %.S,$(depprefix)/%.d,$(deps))
 
-parser/parser.c parser/parser.h: parser/parser.zb
-	zebu -v -m --template=fileio -i $< -o parser/parser
+parser/zebu.c parser/zebu.h: parser/zebu.zb
+	zebu -v -m --template=fileio -i $< -o parser/zebu
 
 $(buildprefix)/%.o $(depprefix)/%.d: %.c | $(buildprefix)/%/ $(depprefix)/%/
 	@ echo "compiling $<"

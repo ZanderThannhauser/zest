@@ -1,0 +1,77 @@
+
+%skip: ' ' | '\t' | '\n';
+
+`string`: '\"' ([!('\\', '\"')] | '\\' ['\"', 'n', 't', '\\'])* '\"';
+
+`integer`: ['0' - '9']+;
+
+file: `string` #path ":" expression ';';
+
+primary_expression
+	: '(' expression ')'
+	| `string` #string
+	| `integer` #integer
+	;
+
+simple_command: (primary_expression #args[])+;
+
+complex_command:
+	simple_command #subcommands[]
+	('<' primary_expression #redirect_in)?
+	('|' simple_command #subcommands[])*
+	('>' primary_expression #redirect_out)?
+	;
+
+prefix_expression
+	: primary_expression
+	| "file" "(" expression ")"
+	| "shell" "(" complex_command ")"
+	;
+
+multiplicative_expression
+	: prefix_expression
+	| prefix_expression '*' multiplicative_expression
+	| prefix_expression '/' multiplicative_expression
+	;
+
+additive_expression
+	: multiplicative_expression
+	| multiplicative_expression '+' multiplicative_expression
+	| multiplicative_expression '-' multiplicative_expression
+	;
+
+equality_expression
+	: additive_expression
+	| additive_expression "==" equality_expression
+	| additive_expression "!=" equality_expression
+	;
+
+ternary_expression
+	: equality_expression
+	| equality_expression '?' expression ':' ternary_expression
+	;
+
+expression: ternary_expression;
+
+assertion: expression;
+
+test: (file #files[] | assertion #assertions[])*;
+
+%start: test #tests[] ("---" test #tests[])*;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,9 +1,51 @@
 
 struct test
 {
-	char* path;
+	char path[PATH_MAX];
+	
 	unsigned index;
 	
-	struct zebu_test* ztest;
+	struct {
+		struct file {
+			char path[PATH_MAX];
+			uint8_t* data;
+			unsigned size;
+		}** data;
+		unsigned n, cap;
+	} files;
+	
+	struct {
+		struct command {
+			char** arg;
+			unsigned n, cap;
+		}** data;
+		unsigned n, cap;
+	} commands;
+	
+	struct {
+		struct keyval {
+			char *key, *val;
+		}** data;
+		unsigned n, cap;
+	} environment;
+	
+	struct {
+		uint8_t* data;
+		unsigned size;
+	} input, output;
+	
+	int exit_code;
 };
+
+
+
+
+
+
+
+
+
+
+
+
 
