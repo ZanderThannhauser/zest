@@ -58,6 +58,49 @@ int main(int argc, char* const* argv)
 		find_tests(tests, test_path);
 	}
 	
+	// cross reference
+	
+	// flatten
+	
+	// open test directory
+	
+	// expressions:
+		// (byte) strings, (mpz) integers, lists
+		// special forms:
+			// shell(<complex-command>):
+				// for each complex command:
+					// for each simple command:
+						// evaluate expressions, save strings
+					// if redirect_in:
+						// open
+					// for each simple command:
+						// fork
+							// execvp
+						// if last:
+							// if redirect_out:
+								// open
+						// else:
+							// pipe
+					// wait, return exit code
+			// file(<string>):
+				// reads all of the content of the path,
+				// returns content as string
+	
+	// for each test:
+		// delete all files in test directory
+		
+		// for each file:
+			// evaluate expression, write string
+		
+		// fork:
+			// chroot
+			// evaluate each expression:
+				// if not true:
+					// print error message
+		// else
+			// waitpid
+			// check exit code
+	
 	TODO;
 	#if 0
 	struct avl_tree_t* records = avl_alloc_tree(compare_records, free_record);
