@@ -14,6 +14,9 @@
 #include <avl/tree_t.h>
 #include <avl/insert.h>
 
+#include <string/new.h>
+#include <string/free.h>
+
 #include <record/new.h>
 
 #include "parse_database.h"
@@ -46,9 +49,13 @@ void parse_database(
 			
 			if (sscanf(line, "%s %u %La ", path, &index, &score) == 3)
 			{
-				struct record* record = new_record(path, index, score);
+				struct string* str = new_string(path);
+				
+				struct record* record = new_record(str, index, score);
 				
 				avl_insert(records, record);
+				
+				free_string(str);
 			}
 			else
 			{

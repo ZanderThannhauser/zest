@@ -1,5 +1,5 @@
 
 struct record* new_record(
-	const char* ro_path,
+	struct string* path,
 	unsigned index,
 	long double score);

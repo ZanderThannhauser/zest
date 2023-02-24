@@ -13,10 +13,7 @@ struct zebu_token
 
 struct zebu_$start
 {
-	struct {
-		struct zebu_test** data;
-		unsigned n, cap;
-	} tests;
+	struct zebu_root* root;
 	unsigned refcount, startline, endline;
 };
 
@@ -25,6 +22,14 @@ struct zebu_additive_expression
 	struct zebu_multiplicative_expression* inner;
 	struct zebu_additive_expression* left;
 	struct zebu_multiplicative_expression* right;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_and_expression
+{
+	struct zebu_equality_expression* inner;
+	struct zebu_and_expression* left;
+	struct zebu_equality_expression* right;
 	unsigned refcount, startline, endline;
 };
 
@@ -45,23 +50,65 @@ struct zebu_complex_command
 	unsigned refcount, startline, endline;
 };
 
+struct zebu_conditional_expression
+{
+	struct zebu_logical_or_expression* conditional;
+	struct zebu_conditional_expression* falsecase;
+	struct zebu_logical_or_expression* inner;
+	struct zebu_expression* truecase;
+	unsigned refcount, startline, endline;
+};
+
 struct zebu_equality_expression
 {
-	struct zebu_additive_expression* inner;
+	struct zebu_relational_expression* inner;
 	struct zebu_equality_expression* left;
-	struct zebu_additive_expression* right;
+	struct zebu_relational_expression* right;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_exclusive_or_expression
+{
+	struct zebu_and_expression* inner;
+	struct zebu_exclusive_or_expression* left;
+	struct zebu_and_expression* right;
 	unsigned refcount, startline, endline;
 };
 
 struct zebu_expression
 {
-	struct zebu_ternary_expression* inner;
+	struct zebu_conditional_expression* inner;
 	unsigned refcount, startline, endline;
 };
 
 struct zebu_file
 {
+	struct zebu_expression* expression;
 	struct zebu_token* path;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_inclusive_or_expression
+{
+	struct zebu_exclusive_or_expression* inner;
+	struct zebu_inclusive_or_expression* left;
+	struct zebu_exclusive_or_expression* right;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_logical_and_expression
+{
+	struct zebu_inclusive_or_expression* inner;
+	struct zebu_logical_and_expression* left;
+	struct zebu_inclusive_or_expression* right;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_logical_or_expression
+{
+	struct zebu_logical_and_expression* inner;
+	struct zebu_logical_or_expression* left;
+	struct zebu_logical_and_expression* right;
 	unsigned refcount, startline, endline;
 };
 
@@ -78,6 +125,7 @@ struct zebu_prefix_expression
 	struct zebu_expression* file;
 	struct zebu_primary_expression* inner;
 	struct zebu_complex_command* shell;
+	struct zebu_prefix_expression* sub;
 	unsigned refcount, startline, endline;
 };
 
@@ -89,20 +137,37 @@ struct zebu_primary_expression
 	unsigned refcount, startline, endline;
 };
 
+struct zebu_relational_expression
+{
+	struct zebu_shift_expression* inner;
+	struct zebu_relational_expression* left;
+	struct zebu_shift_expression* right;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_root
+{
+	struct {
+		struct zebu_test** data;
+		unsigned n, cap;
+	} tests;
+	unsigned refcount, startline, endline;
+};
+
+struct zebu_shift_expression
+{
+	struct zebu_additive_expression* inner;
+	struct zebu_shift_expression* left;
+	struct zebu_additive_expression* right;
+	unsigned refcount, startline, endline;
+};
+
 struct zebu_simple_command
 {
 	struct {
 		struct zebu_primary_expression** data;
 		unsigned n, cap;
 	} args;
-	unsigned refcount, startline, endline;
-};
-
-struct zebu_ternary_expression
-{
-	struct zebu_ternary_expression* falsecase;
-	struct zebu_equality_expression* inner;
-	struct zebu_expression* truecase;
 	unsigned refcount, startline, endline;
 };
 
@@ -124,16 +189,24 @@ struct zebu_test
 extern struct zebu_token* inc_zebu_token(struct zebu_token* token);
 extern struct zebu_$start* inc_zebu_$start(struct zebu_$start* ptree);
 extern struct zebu_additive_expression* inc_zebu_additive_expression(struct zebu_additive_expression* ptree);
+extern struct zebu_and_expression* inc_zebu_and_expression(struct zebu_and_expression* ptree);
 extern struct zebu_assertion* inc_zebu_assertion(struct zebu_assertion* ptree);
 extern struct zebu_complex_command* inc_zebu_complex_command(struct zebu_complex_command* ptree);
+extern struct zebu_conditional_expression* inc_zebu_conditional_expression(struct zebu_conditional_expression* ptree);
 extern struct zebu_equality_expression* inc_zebu_equality_expression(struct zebu_equality_expression* ptree);
+extern struct zebu_exclusive_or_expression* inc_zebu_exclusive_or_expression(struct zebu_exclusive_or_expression* ptree);
 extern struct zebu_expression* inc_zebu_expression(struct zebu_expression* ptree);
 extern struct zebu_file* inc_zebu_file(struct zebu_file* ptree);
+extern struct zebu_inclusive_or_expression* inc_zebu_inclusive_or_expression(struct zebu_inclusive_or_expression* ptree);
+extern struct zebu_logical_and_expression* inc_zebu_logical_and_expression(struct zebu_logical_and_expression* ptree);
+extern struct zebu_logical_or_expression* inc_zebu_logical_or_expression(struct zebu_logical_or_expression* ptree);
 extern struct zebu_multiplicative_expression* inc_zebu_multiplicative_expression(struct zebu_multiplicative_expression* ptree);
 extern struct zebu_prefix_expression* inc_zebu_prefix_expression(struct zebu_prefix_expression* ptree);
 extern struct zebu_primary_expression* inc_zebu_primary_expression(struct zebu_primary_expression* ptree);
+extern struct zebu_relational_expression* inc_zebu_relational_expression(struct zebu_relational_expression* ptree);
+extern struct zebu_root* inc_zebu_root(struct zebu_root* ptree);
+extern struct zebu_shift_expression* inc_zebu_shift_expression(struct zebu_shift_expression* ptree);
 extern struct zebu_simple_command* inc_zebu_simple_command(struct zebu_simple_command* ptree);
-extern struct zebu_ternary_expression* inc_zebu_ternary_expression(struct zebu_ternary_expression* ptree);
 extern struct zebu_test* inc_zebu_test(struct zebu_test* ptree);
 
 
@@ -142,15 +215,27 @@ extern void free_zebu_$start(struct zebu_$start* ptree);
 
 extern void free_zebu_additive_expression(struct zebu_additive_expression* ptree);
 
+extern void free_zebu_and_expression(struct zebu_and_expression* ptree);
+
 extern void free_zebu_assertion(struct zebu_assertion* ptree);
 
 extern void free_zebu_complex_command(struct zebu_complex_command* ptree);
 
+extern void free_zebu_conditional_expression(struct zebu_conditional_expression* ptree);
+
 extern void free_zebu_equality_expression(struct zebu_equality_expression* ptree);
+
+extern void free_zebu_exclusive_or_expression(struct zebu_exclusive_or_expression* ptree);
 
 extern void free_zebu_expression(struct zebu_expression* ptree);
 
 extern void free_zebu_file(struct zebu_file* ptree);
+
+extern void free_zebu_inclusive_or_expression(struct zebu_inclusive_or_expression* ptree);
+
+extern void free_zebu_logical_and_expression(struct zebu_logical_and_expression* ptree);
+
+extern void free_zebu_logical_or_expression(struct zebu_logical_or_expression* ptree);
 
 extern void free_zebu_multiplicative_expression(struct zebu_multiplicative_expression* ptree);
 
@@ -158,9 +243,13 @@ extern void free_zebu_prefix_expression(struct zebu_prefix_expression* ptree);
 
 extern void free_zebu_primary_expression(struct zebu_primary_expression* ptree);
 
-extern void free_zebu_simple_command(struct zebu_simple_command* ptree);
+extern void free_zebu_relational_expression(struct zebu_relational_expression* ptree);
 
-extern void free_zebu_ternary_expression(struct zebu_ternary_expression* ptree);
+extern void free_zebu_root(struct zebu_root* ptree);
+
+extern void free_zebu_shift_expression(struct zebu_shift_expression* ptree);
+
+extern void free_zebu_simple_command(struct zebu_simple_command* ptree);
 
 extern void free_zebu_test(struct zebu_test* ptree);
 

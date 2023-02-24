@@ -5,7 +5,7 @@
 
 `integer`: ['0' - '9']+;
 
-file: `string` #path ":" expression ';';
+file: `string` #path ":" expression #expression ';';
 
 primary_expression
 	: '(' expression #sub ')'
@@ -26,12 +26,17 @@ prefix_expression
 	: primary_expression #inner
 	| "file" "(" expression #file ")"
 	| "shell" "(" complex_command #shell ")"
+	| "!" prefix_expression #sub
+	| "+" prefix_expression #sub
+	| "-" prefix_expression #sub
+	| "~" prefix_expression #sub
 	;
 
 multiplicative_expression
 	: prefix_expression #inner
 	| multiplicative_expression #left '*' prefix_expression #right
 	| multiplicative_expression #left '/' prefix_expression #right
+	| multiplicative_expression #left '%' prefix_expression #right
 	;
 
 additive_expression
@@ -40,24 +45,65 @@ additive_expression
 	| additive_expression #left '-' multiplicative_expression #right
 	;
 
-equality_expression
+shift_expression
 	: additive_expression #inner
-	| equality_expression #left "==" additive_expression #right
-	| equality_expression #left "!=" additive_expression #right
+	| shift_expression #left "<<" additive_expression #right
+	| shift_expression #left ">>" additive_expression #right
 	;
 
-ternary_expression
+relational_expression
+	: shift_expression #inner
+	| relational_expression #left '<'  shift_expression #right
+	| relational_expression #left '>'  shift_expression #right
+	| relational_expression #left "<=" shift_expression #right
+	| relational_expression #left ">=" shift_expression #right
+	;
+
+equality_expression
+	: relational_expression #inner
+	| equality_expression #left "==" relational_expression #right
+	| equality_expression #left "!=" relational_expression #right
+	;
+
+and_expression
 	: equality_expression #inner
-	| equality_expression #inner '?' expression #truecase ':' ternary_expression #falsecase
+	| and_expression #left '&' equality_expression #right
 	;
 
-expression: ternary_expression #inner;
+exclusive_or_expression
+	: and_expression #inner
+	| exclusive_or_expression #left '^' and_expression #right
+	;
+
+inclusive_or_expression
+	: exclusive_or_expression #inner
+	| inclusive_or_expression #left '|' exclusive_or_expression #right
+	;
+
+logical_and_expression
+	: inclusive_or_expression #inner
+	| logical_and_expression #left "&&" inclusive_or_expression #right
+	;
+
+logical_or_expression
+	: logical_and_expression #inner
+	| logical_or_expression #left "||" logical_and_expression #right
+	;
+
+conditional_expression
+	: logical_or_expression #inner
+	| logical_or_expression #conditional '?' expression #truecase ':' conditional_expression #falsecase
+	;
+
+expression: conditional_expression #inner;
 
 assertion: expression #conditional ';';
 
 test: (file #files[] | assertion #assertions[])*;
 
-%start: test #tests[] ("---" test #tests[])*;
+root: test #tests[] ("---" test #tests[])*;
+
+%start: root #root;
 
 
 

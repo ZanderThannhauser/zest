@@ -1,4 +1,4 @@
 
 void store_database(
-	struct record** records, unsigned n,
+	struct flattened_records* flat,
 	const char* path);

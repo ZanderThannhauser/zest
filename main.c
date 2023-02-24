@@ -1,41 +1,13 @@
-
-/*#include <defines/argv0.h>*/
-/*#include <defines/DATABASE_PATH.h>*/
-/*#include <defines/AGILITY.h>*/
-
-/*#include <enums/error.h>*/
-
-/*#include <avl/alloc_tree.h>*/
-/*#include <avl/search.h>*/
-/*#include <avl/free_tree.h>*/
-
-/*#include <parser/parse_files.h>*/
-
-/*#include <test/struct.h>*/
-
-/*#include <record/struct.h>*/
-/*#include <record/compare.h>*/
-/*#include <record/free.h>*/
-
-/*#include <parse_database.h>*/
-
-/*#include <cross_reference.h>*/
-
-/*#include <store_database.h>*/
-
-/*#include <clear_dirfd.h>*/
-/*#include <run_test.h>*/
-
-/*#include <string.h>*/
-/*#include <unistd.h>*/
-/*#include <assert.h>*/
-/*#include <fcntl.h>*/
-/*#include <stdlib.h>*/
-/*#include <stdio.h>*/
-/*#include <sys/stat.h>*/
-/*#include <sys/types.h>*/
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <debug.h>
+
+#include <cmdln/verbose.h>
+
+#include <defines/argv0.h>
+#include <defines/DATABASE_PATH.h>
+#include <defines/AGILITY.h>
 
 #include <cmdln/process.h>
 #include <cmdln/test_paths.h>
@@ -45,6 +17,44 @@
 
 #include <parser/find_tests.h>
 
+#include <record/struct.h>
+#include <record/compare.h>
+#include <record/free.h>
+
+#include <parse_database.h>
+
+#include <cross_reference.h>
+
+#include <flatten_and_sort.h>
+
+#include <misc/mkdiropenat.h>
+
+#include <flattened_records/struct.h>
+
+#include <string/struct.h>
+
+#include <test/struct.h>
+
+#include <misc/recursive_unlink.h>
+
+#include <parser/zebu.h>
+
+#include <misc/unescape.h>
+
+#include <evaluate/expression.h>
+
+#include <value/free.h>
+
+#include <value/struct.h>
+
+#include <value/string/struct.h>
+
+#include <store_database.h>
+
+#include <flattened_records/free.h>
+
+#include <value/bool/struct.h>
+
 int main(int argc, char* const* argv)
 {
 	ENTER;
@@ -53,144 +63,142 @@ int main(int argc, char* const* argv)
 	
 	struct avl_tree_t* tests = avl_alloc_tree(compare_tests, free_test);
 	
-	for (char* test_path; (test_path = *test_paths++); )
-	{
-		find_tests(tests, test_path);
-	}
+	find_tests(tests, test_paths);
 	
-	// cross reference
-	
-	// flatten
-	
-	// open test directory
-	
-	// expressions:
-		// (byte) strings, (mpz) integers, lists
-		// special forms:
-			// shell(<complex-command>):
-				// for each complex command:
-					// for each simple command:
-						// evaluate expressions, save strings
-					// if redirect_in:
-						// open
-					// for each simple command:
-						// fork
-							// execvp
-						// if last:
-							// if redirect_out:
-								// open
-						// else:
-							// pipe
-					// wait, return exit code
-			// file(<string>):
-				// reads all of the content of the path,
-				// returns content as string
-	
-	// for each test:
-		// delete all files in test directory
-		
-		// for each file:
-			// evaluate expression, write string
-		
-		// fork:
-			// chroot
-			// evaluate each expression:
-				// if not true:
-					// print error message
-		// else
-			// waitpid
-			// check exit code
-	
-	TODO;
-	#if 0
 	struct avl_tree_t* records = avl_alloc_tree(compare_records, free_record);
 	
 	parse_database(records, DATABASE_PATH);
 	
 	cross_reference(tests, records);
 	
-	struct {
-		struct record** data;
-		unsigned n, cap;
-	} flattened_records = {};
+	struct flattened_records* flat = flatten_and_sort(records);
 	
-	for (struct avl_node_t* node = records->head; node; node = node->next)
-	{
-		if (flattened_records.n == flattened_records.cap)
-		{
-			flattened_records.cap = flattened_records.cap << 1 ?: 1;
-			flattened_records.data = realloc(flattened_records.data,
-				sizeof(*flattened_records.data) * flattened_records.cap);
-		}
-		
-		flattened_records.data[flattened_records.n++] = node->item;
-	}
+	// open test directory
+	int test_dirfd = mkdiropenat("/tmp/", "zest", NULL);
 	
-	qsort(flattened_records.data, flattened_records.n,
-		sizeof(*flattened_records.data), ({
-			int compare(const void* a, const void* b)
-			{
-				const struct record *const *A = a, *const *B = b;
-				
-				if ((*A)->score > (*B)->score)
-					return +1;
-				else if ((*A)->score < (*B)->score)
-					return -1;
-				else
-					return strcmp((*A)->path, (*B)->path);
-			}
-			compare;
-		}));
-	
-	int tmp_dirfd = -1, zest_dirfd = -1;
-	
-	if ((tmp_dirfd = open("/tmp/", O_PATH)) < 0)
-	{
-		fprintf(stderr, "%s: open(\"/tmp/\"): %m\n", argv0);
-		exit(e_syscall_failed);
-	}
-	else if (mkdirat(tmp_dirfd, "zest", 0774) < 0 && errno != EEXIST)
-	{
-		fprintf(stderr, "%s: mkdir(\"zest\"): %m\n", argv0);
-		exit(e_syscall_failed);
-	}
-	else if ((zest_dirfd = openat(tmp_dirfd, "zest", O_PATH)) < 0)
-	{
-		fprintf(stderr, "%s: open(\"zest\"): %m\n", argv0);
-		exit(e_syscall_failed);
-	}
+	dpv(test_dirfd);
 	
 	bool is_passing = true;
 	
-	for (unsigned i = 0, n = flattened_records.n; is_passing && i < n; i++)
+	for (unsigned i = 0, n = flat->n; is_passing && i < n; i++)
 	{
-		struct record* record = flattened_records.data[i];
+		struct record* record = flat->data[i];
+		
+		dpvs(record->path->chars);
 		
 		printf(
 			"\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m" "\n",
-			i + 1, n, record->index + 1, record->path);
+			i + 1, n, record->index + 1, record->path->chars);
 		
 		fflush(stdout);
 		
-		struct avl_node_t* node = avl_search(tests, &(struct test) {record->path, record->index});
+		struct avl_node_t* node = avl_search(tests,
+			&(struct test) {record->path, record->index});
 		assert(node);
 		
-		clear_dirfd(zest_dirfd);
+		recursive_unlink(test_dirfd, ".");
 		
-		// write files
+		struct test* test = node->item;
 		
-		// fork:
-			// chroot
-			// for each command:
-				// parse and exec
-		// else: waitpid
+		for (unsigned i = 0, n = test->ztest->files.n; is_passing && i < n; i++)
+		{
+			struct zebu_file* zfile = test->ztest->files.data[i];
+			
+			struct unescaped path = unescape(zfile->path);
+			
+			dpvsn(path.data, path.n);
+			
+			struct value* content = evaluate_expression(zfile->expression);
+			
+			if (!content)
+				is_passing = false;
+			else if (content->kind != vk_string)
+				fprintf(stderr, "%s: file content must be a string!\n", argv0),
+				is_passing = false;
+			else
+			{
+				struct string_value* spef = (void*) content;
+				
+				int fd = openat(test_dirfd, (void*) path.data, O_WRONLY | O_TRUNC | O_CREAT, 0664);
+				uint8_t* moving = spef->data;
+				size_t left = spef->len;
+				ssize_t res;
+				
+				if (fd < 0)
+					fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, path.data),
+					is_passing = false;
+				else while (left && (res = write(fd, moving, left)) > 0)
+					moving += res, left -= res;
+				
+				if (res < 0)
+					fprintf(stderr, "%s: write(): %m\n", argv0),
+					is_passing = false;
+				
+				if (verbose)
+					printf("%s: wrote '%s'\n", argv0, (char*) path.data);
+				
+				close(fd);
+			}
+			
+			free_value(content);
+			
+			free(path.data);
+		}
 		
-		TODO;
-		#if 0
-		is_passing = run_test(zest_dirfd, node->item);
+		if (is_passing)
+		{
+			pid_t child = -1;
+			
+			int wstatus;
+			
+			if ((child = fork()) < 0)
+			{
+				TODO;
+				exit(1);
+			}
+			else if (!child)
+			{
+				*environ = NULL;
+				
+				if (fchdir(test_dirfd) < 0)
+					fprintf(stderr, "%s: chdir(): %m\n", argv0),
+					exit(1);
+				else if (chroot(".") < 0)
+					fprintf(stderr, "%s: chroot(): %m\n", argv0),
+					exit(1);
+				else for (unsigned i = 0, n = test->ztest->assertions.n;
+					i < n; i++)
+				{
+					struct zebu_expression* assertion =
+						test->ztest->assertions.data[i]->conditional;
+					
+					struct value* res = evaluate_expression(assertion);
+					
+					if (!res)
+						exit(1);
+					else if (res->kind != vk_bool)
+						fprintf(stderr, "%s: assertions must return a bool value!\n", argv0),
+						exit(1);
+					else if (!((struct bool_value*) res)->value)
+						fprintf(stderr, "%s: assertion failed!\n", argv0),
+						exit(1);
+					else
+						free_value(res);
+				}
+				
+				exit(0);
+			}
+			else if (waitpid(child, &wstatus, 0) < 0)
+			{
+				TODO;
+				exit(1);
+			}
+			else if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus))
+				fprintf(stderr, "%s: subcommands failed!\n", argv0),
+				is_passing = false;
+		}
 		
 		record->score = (is_passing + record->score * (AGILITY - 1)) / AGILITY;
-		#endif
 	}
 	
 	if (is_passing)
@@ -198,23 +206,18 @@ int main(int argc, char* const* argv)
 		printf("\e[K" "\e[32m" "all tests pass!" "\e[m" "\n");
 	}
 	
-	store_database(flattened_records.data, flattened_records.n, DATABASE_PATH);
+	store_database(flat, DATABASE_PATH);
 	
-	free(flattened_records.data);
+	free_flattened_records(flat);
 	
 	avl_free_tree(records);
 	
 	avl_free_tree(tests);
 	
-	free_cmdln(flags);
-	
-	close(zest_dirfd);
-	
-	close(tmp_dirfd);
+	close(test_dirfd);
 	
 	EXIT;
 	return is_passing ? 0 : e_failed_test;
-	#endif
 }
 
 

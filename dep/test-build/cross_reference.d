@@ -3,4 +3,5 @@ gen/test-build/./cross_reference.o: cross_reference.c debug.h \
  enums/error.h avl/alloc_tree.h avl/tree_t.h avl/freeitem_t.h \
  avl/compare_t.h avl/node_t.h avl/free_tree.h avl/insert.h avl/search.h \
  avl/delete_node.h avl/tree_t.h test/struct.h record/struct.h \
- record/new.h record/compare.h cross_reference.h
+ record/new.h record/compare.h string/struct.h string/compare.h \
+ cross_reference.h

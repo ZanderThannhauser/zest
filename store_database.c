@@ -10,10 +10,14 @@
 
 #include <record/struct.h>
 
+#include <flattened_records/struct.h>
+
+#include <string/struct.h>
+
 #include "store_database.h"
 
 void store_database(
-	struct record** records, unsigned n,
+	struct flattened_records* flat,
 	const char* path)
 {
 	ENTER;
@@ -26,17 +30,31 @@ void store_database(
 		exit(e_syscall_failed);
 	}
 	
-	for (unsigned i = 0; i < n; i++)
+	for (unsigned i = 0, n = flat->n; i < n; i++)
 	{
-		struct record* record = records[i];
+		struct record* record = flat->data[i];
 		
-		dpvs(record->path);
+		dpvs(record->path->chars);
 		
-		fprintf(stream, "%s\t%u\t%La\n", record->path, record->index, record->score);
+		fprintf(stream, "%s\t%u\t%La\n",
+			record->path->chars, record->index, record->score);
 	}
 	
 	fclose(stream);
 	
 	EXIT;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 

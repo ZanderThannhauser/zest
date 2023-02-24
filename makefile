@@ -62,6 +62,9 @@ ARGS += ./tests
 run: $(buildprefix)/zest
 	$< $(ARGS)
 
+sudo-run: $(buildprefix)/zest
+	sudo $< $(ARGS)
+
 valrun: $(buildprefix)/zest
 	valgrind $< $(ARGS)
 

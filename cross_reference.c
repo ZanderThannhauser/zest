@@ -20,6 +20,9 @@
 #include <record/new.h>
 #include <record/compare.h>
 
+#include <string/struct.h>
+#include <string/compare.h>
+
 #include "cross_reference.h"
 
 void cross_reference(
@@ -36,10 +39,12 @@ void cross_reference(
 		struct test *at = tnode->item;
 		struct record *rt = rnode->item;
 		
-		int cmp = strcmp(at->path, rt->path) ?: at->index - rt->index;
+		int cmp = compare_strings(at->path, rt->path) ?: at->index - rt->index;
 		
 		if (cmp < 0)
 		{
+			TODO;
+			#if 0
 			dpvs(at->path);
 			dpv(at->index);
 			
@@ -52,12 +57,16 @@ void cross_reference(
 			}
 			
 			tnode = tnode->next;
+			#endif
 		}
 		else if (cmp > 0)
 		{
+			TODO;
+			#if 0
 			struct avl_node_t* new = rnode->next;
 			avl_delete_node(records, rnode);
 			rnode = new;
+			#endif
 		}
 		else
 		{
@@ -70,7 +79,7 @@ void cross_reference(
 	{
 		struct test* test = tnode->item;
 		
-		dpvs(test->path);
+		dpvs(test->path->chars);
 		dpv(test->index);
 		
 		struct record* record = new_record(test->path, test->index, 0.0);
@@ -86,9 +95,12 @@ void cross_reference(
 	
 	while (rnode)
 	{
+		TODO;
+		#if 0
 		struct avl_node_t* new = rnode->next;
 		avl_delete_node(records, rnode);
 		rnode = new;
+		#endif
 	}
 	
 	EXIT;

@@ -1,3 +1,3 @@
 
-char*const* test_paths;
+char* const* test_paths;
 

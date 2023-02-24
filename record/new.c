@@ -5,25 +5,25 @@
 
 #include <memory/smalloc.h>
 
+#include <string/inc.h>
+
 #include "struct.h"
 #include "new.h"
 
 struct record* new_record(
-	const char* ro_path,
+	struct string* path,
 	unsigned index,
 	long double score)
 {
 	ENTER;
 	
-	char* path = strdup(ro_path);
-	
 	struct record* this = smalloc(sizeof(*this));
 	
-	this->path = path;
+	this->path = inc_string(path);
 	this->index = index;
 	this->score = score;
 	
-	dpvs(this->path);
+	this->refcount = 1;
 	
 	EXIT;
 	return this;

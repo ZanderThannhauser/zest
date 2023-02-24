@@ -3,6 +3,8 @@
 
 #include <debug.h>
 
+#include <string/free.h>
+
 #include "struct.h"
 #include "free.h"
 
@@ -12,10 +14,14 @@ void free_record(void* ptr)
 	
 	struct record* this = ptr;
 	
-	dpvs(this->path);
-	
-	free(this->path);
-	free(this);
+	if (!--this->refcount)
+	{
+		dpvs(this->path);
+		
+		free_string(this->path);
+		
+		free(this);
+	}
 	
 	EXIT;
 }

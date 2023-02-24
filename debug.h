@@ -27,6 +27,30 @@
 	#include <time.h>
 	#include <pwd.h>
 	
+	struct cmdln_flags;
+	struct avl_tree_t;
+	struct avl_node_t;
+	struct zebu_test;
+	struct record;
+	struct test;
+	struct string;
+	struct value;
+	struct zebu_expression;
+	struct zebu_conditional_expression;
+	struct zebu_inclusive_or_expression;
+	struct zebu_logical_and_expression;
+	struct zebu_exclusive_or_expression;
+	struct zebu_and_expression;
+	struct zebu_equality_expression;
+	struct zebu_relational_expression;
+	struct zebu_shift_expression;
+	struct zebu_additive_expression;
+	struct zebu_multiplicative_expression;
+	struct zebu_prefix_expression;
+	struct zebu_primary_expression;
+	struct value_inheritance;
+	struct flattened_records;
+	
 	#include <memory/smalloc.h>
 	#include <memory/srealloc.h>
 	
@@ -35,13 +59,6 @@
 	#include <macros/strequals.h>
 	
 	#include <enums/error.h>
-	
-	struct cmdln_flags;
-	struct avl_tree_t;
-	struct avl_node_t;
-	struct zebu_test;
-	struct record;
-	struct test;
 	
 	#include <avl/alloc_tree.h>
 	#include <avl/free_tree.h>

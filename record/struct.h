@@ -1,9 +1,12 @@
 
 struct record
 {
-	char* path;
+	struct string* path;
+	
 	unsigned index;
 	
 	long double score;
+	
+	unsigned refcount;
 };
 
