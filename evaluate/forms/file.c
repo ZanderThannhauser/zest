@@ -1,5 +1,22 @@
 
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <assert.h>
+
 #include <debug.h>
+
+#include <memory/srealloc.h>
+
+#include <enums/error.h>
+
+#include <defines/argv0.h>
+
+#include <cmdln/verbose.h>
+
+#include <misc/escape.h>
 
 #include <value/string/struct.h>
 #include <value/string/new.h>
@@ -13,6 +30,8 @@ struct value* evaluate_file_form(
 	struct zebu_expression* expression)
 {
 	ENTER;
+	
+	HERE;
 	
 	struct value* path = evaluate_expression(expression);
 	
@@ -28,16 +47,18 @@ struct value* evaluate_file_form(
 	
 	char chunk[4096], *data = NULL;
 	unsigned n = 0, cap = 0;
-	ssize_t res;
+	ssize_t res = 0;
 	
 	int fd = open(text->chars, O_RDONLY);
+	
+	dpv(fd);
 	
 	if (fd < 0)
 	{
 		fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, text->chars);
 		exit(e_failed_test);
 	}
-	else while (errno = 0, (res = read(fd, chunk, sizeof(chunk))) > 0)
+	else do
 	{
 		while (n + res >= cap)
 		{
@@ -47,6 +68,7 @@ struct value* evaluate_file_form(
 		
 		memcpy(data + n, chunk, res), n += res;
 	}
+	while (errno = 0, (res = read(fd, chunk, sizeof(chunk))) > 0);
 	
 	if (res < 0)
 	{
@@ -54,12 +76,18 @@ struct value* evaluate_file_form(
 		exit(1);
 	}
 	
+	close(fd);
+	
 	data[n] = 0;
 	
-	dpv(n);
-	dpvsn(data, n);
-	
-	close(fd);
+	#if 0
+	if (verbose)
+	{
+		char* escaped = escape(data, n);
+		printf("%s: file(\"%s\") == %s\n", argv0, text->chars, escaped);
+		free(escaped);
+	}
+	#endif
 	
 	struct value* content = new_string_value(data, n);
 	
@@ -68,6 +96,16 @@ struct value* evaluate_file_form(
 	EXIT;
 	return content;
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

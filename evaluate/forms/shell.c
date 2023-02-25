@@ -1,9 +1,19 @@
 
-       #include <sys/types.h>
-       #include <sys/wait.h>
-
+#include <stdlib.h>
+#include <assert.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <debug.h>
+
+#include <defines/argv0.h>
+
+#include <memory/smalloc.h>
+
+#include <cmdln/verbose.h>
 
 #include <parser/zebu.h>
 
@@ -21,8 +31,9 @@ struct value* evaluate_shell_form(
 {
 	bool happy = true;
 	
-	int redirect_in_fd = -1;
-	int redirect_out_fd = -1;
+	struct {
+		int src, dst;
+	} redirect_in = {-1, 0}, redirect_out = {-1, 1};
 	
 	unsigned n = complex_command->subcommands.n;
 	
@@ -48,11 +59,22 @@ struct value* evaluate_shell_form(
 		{
 			struct string_value* spef = (struct string_value*) res;
 			
-			if ((redirect_in_fd = open(spef->chars, O_RDONLY | O_CLOEXEC)) < 0)
+			if ((redirect_in.src = open(spef->chars, O_RDONLY | O_CLOEXEC)) < 0)
 			{
 				fprintf(stderr, "%s: error in shell redirect-in: open(\"%s\"): %m\n", argv0, spef->chars);
 				happy = false;
 			}
+		}
+		
+		char* c = (char*) complex_command->rinfd->data + 1;
+		
+		if (*c)
+		{
+			redirect_in.dst = 0;
+			do redirect_in.dst = redirect_in.dst * 10 + *c++ - '0';
+			while (*c && index("0123456789", *c));
+			
+			dpv(redirect_in.dst);
 		}
 		
 		free_value(res);
@@ -72,11 +94,22 @@ struct value* evaluate_shell_form(
 		{
 			struct string_value* spef = (struct string_value*) res;
 			
-			if ((redirect_out_fd = open(spef->chars, O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0664)) < 0)
+			if ((redirect_out.src = open(spef->chars, O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0664)) < 0)
 			{
 				fprintf(stderr, "%s: error in shell redirect-out: open(\"%s\"): %m\n", argv0, spef->chars);
 				happy = false;
 			}
+		}
+		
+		char* c = (char*) complex_command->routfd->data + 1;
+		
+		if (*c)
+		{
+			redirect_out.dst = 0;
+			do redirect_out.dst = redirect_out.dst * 10 + *c++ - '0';
+			while (*c && index("0123456789", *c));
+			
+			dpv(redirect_out.dst);
 		}
 		
 		free_value(res);
@@ -141,9 +174,9 @@ struct value* evaluate_shell_form(
 						happy = false;
 					}
 				}
-				else if (redirect_in_fd > 0)
+				else if (redirect_in.src > 0)
 				{
-					if (dup2(redirect_in_fd, 0) < 0)
+					if (dup2(redirect_in.src, redirect_in.dst) < 0)
 					{
 						TODO;
 						happy = false;
@@ -164,9 +197,9 @@ struct value* evaluate_shell_form(
 							happy = false;
 						}
 					}
-					else if (redirect_out_fd > 0)
+					else if (redirect_out.src > 0)
 					{
-						if (dup2(redirect_out_fd, 1) < 0)
+						if (dup2(redirect_out.src, redirect_out.dst) < 0)
 						{
 							TODO;
 							happy = false;
@@ -227,17 +260,27 @@ struct value* evaluate_shell_form(
 		}
 	}
 	
-	if (redirect_in_fd > 0)
-		close(redirect_in_fd);
+	if (redirect_in.src > 0)
+		close(redirect_in.src);
 	
-	if (redirect_out_fd > 0)
-		close(redirect_out_fd);
+	if (redirect_out.src > 0)
+		close(redirect_out.src);
 	
 	free(pipes);
 	
 	dpv(code);
 	
-	return happy ? new_int_value(code) : NULL;
+	if (happy)
+	{
+		if (verbose)
+			printf("%s: shell() returned %u\n", argv0, code);
+		
+		return new_int_value(code);
+	}
+	else
+	{
+		return NULL;
+	}
 }
 
 

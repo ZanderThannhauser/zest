@@ -7,7 +7,7 @@
 void free_bool_value(
 	struct value* super)
 {
-	struct bool_value* this = (void*) super;
+/*	struct bool_value* this = (void*) super;*/
 	ENTER;
 	
 	EXIT;

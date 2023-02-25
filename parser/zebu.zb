@@ -8,7 +8,7 @@
 `chmod`: ['u', 'g', 'o', 'a']*
 	(['-','+','='] (['r', 'w', 'x', 'X', 's', 't']+ | ['u', 'g', 'o']))+;
 
-`octal`: ['0'-'7'] ['0'-'7'] ['0'-'7'];
+`octal`: ['0'-'7']{,4};
 
 file:
 	`string` #path
@@ -25,32 +25,32 @@ simple_command: (primary_expression #args[])+;
 
 complex_command:
 	simple_command #subcommands[]
-	('<' primary_expression #redirect_in)?
+	(`'<' ['0'-'9']*` #rinfd  primary_expression #redirect_in)?
 	('|' simple_command #subcommands[])*
-	('>' primary_expression #redirect_out)?
+	(`'>' ['0'-'9']*` #routfd primary_expression #redirect_out)?
 	;
 
 prefix_expression
 	: primary_expression #inner
-	| "file" "(" expression #file ")"
+	| "file"  "(" expression #file ")"
 	| "shell" "(" complex_command #shell ")"
-	| "!" prefix_expression #sub
-	| "+" prefix_expression #sub
-	| "-" prefix_expression #sub
-	| "~" prefix_expression #sub
+	| "+"         prefix_expression #sub
+	| "!" #logneg prefix_expression #sub
+	| "-" #numneg prefix_expression #sub
+	| "~" #bitneg prefix_expression #sub
 	;
 
 multiplicative_expression
 	: prefix_expression #inner
-	| multiplicative_expression #left '*' prefix_expression #right
-	| multiplicative_expression #left '/' prefix_expression #right
-	| multiplicative_expression #left '%' prefix_expression #right
+	| multiplicative_expression #left '*' #mul prefix_expression #right
+	| multiplicative_expression #left '/' #div prefix_expression #right
+	| multiplicative_expression #left '%' #rem prefix_expression #right
 	;
 
 additive_expression
 	: multiplicative_expression #inner
-	| additive_expression #left '+' multiplicative_expression #right
-	| additive_expression #left '-' multiplicative_expression #right
+	| additive_expression #left '+' #add multiplicative_expression #right
+	| additive_expression #left '-' #sub multiplicative_expression #right
 	;
 
 shift_expression
@@ -69,8 +69,8 @@ relational_expression
 
 equality_expression
 	: relational_expression #inner
-	| equality_expression #left "==" relational_expression #right
-	| equality_expression #left "!=" relational_expression #right
+	| equality_expression #left "==" #eq relational_expression #right
+	| equality_expression #left "!=" #nq relational_expression #right
 	;
 
 and_expression

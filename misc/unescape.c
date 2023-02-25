@@ -1,7 +1,11 @@
 
+#include <assert.h>
+
 #include <debug.h>
 
 #include <parser/zebu.h>
+
+#include <memory/srealloc.h>
 
 #include "unescape.h"
 

@@ -1,4 +1,5 @@
 
+struct string;
 struct zebu_test;
 
 struct test* new_test(

@@ -1,4 +1,6 @@
 
+#include <fcntl.h>
+
 #include <debug.h>
 
 #include "opendirat.h"

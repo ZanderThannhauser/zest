@@ -1,5 +1,6 @@
 set -ev
+unset on_error
 make buildtype=debug
 make buildtype=test
 make buildtype=release
-zest ./tests/ || more /tmp/zest/output.txt
+zest ./tests/ -v

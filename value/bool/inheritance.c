@@ -1,11 +1,13 @@
 
 #include "../inheritance.h"
 
-#include "free.h"
 #include "inheritance.h"
+#include "print.h"
+#include "free.h"
 
 struct value_inheritance bool_value_inheritance = {
-	free_bool_value,
+	.print = bool_value_print,
+	.free = free_bool_value,
 };
 
 

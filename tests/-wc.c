@@ -78,7 +78,7 @@ int main(int argc, char* const* argv)
 		int fd = open(arg, O_RDONLY);
 		
 		if (fd < 0)
-			fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, arg),
+			fprintf(stderr, "%s: %s: %m\n", argv0, arg),
 			exit(1);
 		else
 			count(fd);
@@ -87,13 +87,22 @@ int main(int argc, char* const* argv)
 	}
 	while ((arg = argv[optind++]));
 	
-	if (display & 4) printf("%u ", lines);
-	if (display & 2) printf("%u ", words);
-	if (display & 1) printf("%u ", chars);
+	if (display & 4) printf("%u", lines);
+	if (display & 2) printf("%s%u", display & 4 ? " " : "", words);
+	if (display & 1) printf("%s%u", display & 6 ? " " : "", chars);
 	puts("");
 	
 	return 0;
 }
+
+
+
+
+
+
+
+
+
 
 
 

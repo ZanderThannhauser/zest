@@ -1,11 +1,19 @@
 
+#include <stdlib.h>
+
 #include <debug.h>
+
+#include <avl/insert.h>
+
+#include <enums/error.h>
 
 #include <cmdln/verbose.h>
 
 #include <test/new.h>
 
 #include <string/struct.h>
+
+#include <defines/argv0.h>
 
 #include "zebu.h"
 #include "parse_test.h"
@@ -26,7 +34,7 @@ void parse_test(
 	
 	if (verbose)
 	{
-		printf("parsing '%s'...\n", path->chars);
+		printf("%s: parsing '%s'...\n", argv0, path->chars);
 	}
 	
 	struct zebu_$start* start = zebu_parse(stream);

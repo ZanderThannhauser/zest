@@ -1,19 +1,12 @@
 
-/*#include <assert.h>*/
-/*#include <stdbool.h>*/
-/*#include <sys/types.h>*/
-/*#include <sys/wait.h>*/
-/*#include <stdlib.h>*/
-/*#include <sys/types.h>*/
-/*#include <sys/stat.h>*/
-/*#include <fcntl.h>*/
-/*#include <unistd.h>*/
-
-/*#include <defines/argv0.h>*/
-
-/*#include <test/struct.h>*/
-
-/*#include <parser/parser.h>*/
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <debug.h>
 
@@ -21,11 +14,14 @@
 
 #include <parser/zebu.h>
 
+#include <defines/argv0.h>
+
 #include <misc/unescape.h>
 
 #include <evaluate/expression.h>
 
 #include <value/struct.h>
+#include <value/bool/struct.h>
 #include <value/string/struct.h>
 #include <value/free.h>
 
@@ -63,7 +59,17 @@ bool run_test(
 			
 			if (zfile->octal)
 			{
-				TODO;
+				errno = 0;
+				
+				char* m;
+				unsigned long num = strtoul((char*) zfile->octal, &m, 8);
+				
+				if (errno || *m)
+					fprintf(stderr, "%s: invalid octal "
+						"mode '%s'!\n", argv0, (char*) zfile->octal),
+					is_passing = false;
+				else
+					mode = 0777 & num;
 			}
 			else for (unsigned i = 0, n = zfile->chmods.n; i < n; i++)
 			{
@@ -71,82 +77,66 @@ bool run_test(
 				
 				dpvsn(code->data, code->len);
 				
-				char* moving = code->data;
+				char* moving = (char*) code->data;
 				
-				// this needs to be better.
-				TODO;
-				#if 0
-				unsigned ugo = 0;
+				mode_t mask = 0;
 				
-				ugo_loop: switch (*moving)
+				while (index("ugoa", *moving)) switch (*moving++)
 				{
-					case 'u': ugo |= 4, moving++; goto ugo_loop;
-					case 'g': ugo |= 2, moving++; goto ugo_loop;
-					case 'o': ugo |= 1, moving++; goto ugo_loop;
+					case 'u': mask |= 05700; break;
+					case 'g': mask |= 03070; break;
+					case 'o': mask |= 01007; break;
+					case 'a': mask |= 07777; break;
 				}
 				
-				if (ugo) ugo = 7;
+				if (!mask) mask = -1;
 				
-				while (index("+=-", c))
+				while (*moving && index("+-=", *moving))
 				{
 					mode_t bits = 0;
 					
-					switch (*moving)
+					char action = *moving++;
+					
+					dpvc(action);
+					
+					if (index("ugo", *moving))
 					{
-						case 'u': bits = mode >> 6, moving++; break;
-						case 'g': bits = mode >> 3, moving++; break;
-						case 'o': bits = mode >> 0, moving++; break;
+						switch (*moving++)
+						{
+							case 'u': bits = 7 & (mode >> 6); break;
+							case 'g': bits = 7 & (mode >> 3); break;
+							case 'o': bits = 7 & (mode >> 0); break;
+						}
 						
-						rwxXst_loop:
-						case 'r': case 'w':
-						case 'x': case 'X':
-						case 's': case 't':
-							switch (*moving)
-							{
-								case 'r': bits |= 4; break;
-								case 'w': bits |= 2; break;
-								case 'x': bits |= 1; break;
-								case 'X': bits |= !!(mode & 0111); break;
-								case 's': bits |= 04000; break;
-								case 't': bits |= 01000; break;
-							}
+						bits |= bits << 6 | bits << 3;
+					}
+					else while (*moving && index("rwxXst", *moving))
+					{
+						switch (*moving++)
+						{
+							case 'r': bits |= 00444; break;
+							case 'w': bits |= 00222; break;
+							case 'x': bits |= 00111; break;
+							case 'X': bits |= mode & 00111 ? 00111 : 0; break;
+							case 's': bits |= 06000; break;
+							case 't': bits |= 01000; break;
+						}
 					}
 					
 					switch (action)
 					{
-						case '+':
-						{
-							if (action & 4) mode |= bits << 6;
-							if (action & 2) mode |= bits << 3;
-							if (action & 1) mode |= bits << 0;
-							break;
-						}
+						case '+': mode |=  mask &  bits; break;
 						
-						case '=':
-						{
-							if (action & 4) mode |= bits << 6;
-							if (action & 2) mode |= bits << 3;
-							if (action & 1) mode |= bits << 0;
-							break;
-						}
+						case '-': mode &= ~mask | ~bits; break;
 						
-						case '-':
-						{
-							if (action & 4) mode &= ~(bits << 6);
-							if (action & 2) mode &= ~(bits << 3);
-							if (action & 1) mode &= ~(bits << 0);
-							break;
-						}
+						case '=': mode = (mask & bits) | (~mask & mode); break;
 					}
 				}
-				#endif
 				
-				assert(!*ugo);
-				
-				TODO;
+				assert(!*moving);
 			}
 			
-			TODO;
+			dpvo(mode);
 			
 			struct string_value* spef = (void*) content;
 			
@@ -157,6 +147,9 @@ bool run_test(
 			
 			if (fd < 0)
 				fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, path.chars),
+				is_passing = false;
+			else if (fchmod(fd, mode) < 0)
+				fprintf(stderr, "%s: fchmod(): %m\n", argv0),
 				is_passing = false;
 			else while (left && (res = write(fd, moving, left)) > 0)
 				moving += res, left -= res;
@@ -176,26 +169,18 @@ bool run_test(
 		free(path.chars);
 	}
 	
-	TODO;
-	#if 0
 	if (is_passing)
 	{
-		dpv(getpid());
-		
 		pid_t child = -1;
 		
 		int wstatus;
 		
 		if ((child = fork()) < 0)
-		{
-			TODO;
-			exit(1);
-		}
+			fprintf(stderr, "%s: fork(): %m\n", argv0),
+			is_passing = false;
 		else if (!child)
 		{
 			*environ = NULL;
-			
-			dpv(getpid());
 			
 			if (fchdir(test_dirfd) < 0)
 				fprintf(stderr, "%s: chdir(): %m\n", argv0),
@@ -206,11 +191,10 @@ bool run_test(
 			else if (chdir("/") < 0)
 				fprintf(stderr, "%s: chdir(): %m\n", argv0),
 				exit(1);
-			else for (unsigned i = 0, n = test->ztest->assertions.n;
-				i < n; i++)
+			else for (unsigned i = 0, n = test->assertions.n; i < n; i++)
 			{
 				struct zebu_expression* assertion =
-					test->ztest->assertions.data[i]->conditional;
+					test->assertions.data[i]->conditional;
 				
 				struct value* res = evaluate_expression(assertion);
 				
@@ -222,24 +206,24 @@ bool run_test(
 				else if (!((struct bool_value*) res)->value)
 					fprintf(stderr, "%s: assertion failed!\n", argv0),
 					exit(1);
-				else
-					free_value(res);
+				
+				free_value(res);
 			}
 			
+			fflush(stdout);
+			fflush(stderr);
 			exit(0);
 		}
 		else if (waitpid(child, &wstatus, 0) < 0)
-		{
-			TODO;
-			exit(1);
-		}
+			fprintf(stderr, "%s: waitpid(): %m\n", argv0),
+			is_passing = false;
 		else if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus))
 			fprintf(stderr, "%s: subcommands failed!\n", argv0),
 			is_passing = false;
 	}
 	
-	#endif
 	EXIT;
+	return is_passing;
 }
 
 

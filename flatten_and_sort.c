@@ -1,4 +1,6 @@
 
+#include <stdlib.h>
+
 #include <debug.h>
 
 #include <record/struct.h>
@@ -8,6 +10,8 @@
 #include <flattened_records/append.h>
 
 #include <string/compare.h>
+
+#include <avl/tree_t.h>
 
 #include "flatten_and_sort.h"
 

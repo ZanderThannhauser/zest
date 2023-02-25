@@ -1,7 +1,14 @@
 
+#include <gmp.h>
+#include <assert.h>
+
 #include <debug.h>
 
 #include <parser/zebu.h>
+
+#include <value/free.h>
+#include <value/struct.h>
+#include <value/int/struct.h>
 
 #include "forms/file.h"
 #include "forms/shell.h"
@@ -29,7 +36,35 @@ struct value* evaluate_prefix_expression(
 	}
 	else if (expression->sub)
 	{
-		TODO;
+		if (expression->logneg)
+		{
+			TODO;
+		}
+		else if (expression->numneg)
+		{
+			result = evaluate_prefix_expression(expression->sub);
+			
+			if (result->kind == vk_int)
+			{
+				struct int_value* spef = (void*) result;
+				
+				mpz_neg(spef->mpz, spef->mpz);
+			}
+			else
+			{
+				free_value(result);
+				
+				result = NULL;
+			}
+		}
+		else if (expression->bitneg)
+		{
+			TODO;
+		}
+		else
+		{
+			result = evaluate_prefix_expression(expression->sub);
+		}
 	}
 	else
 	{
@@ -39,4 +74,20 @@ struct value* evaluate_prefix_expression(
 	EXIT;
 	return result;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -19,9 +19,11 @@ struct zebu_$start
 
 struct zebu_additive_expression
 {
+	struct zebu_token* add;
 	struct zebu_multiplicative_expression* inner;
 	struct zebu_additive_expression* left;
 	struct zebu_multiplicative_expression* right;
+	struct zebu_token* sub;
 	unsigned refcount, startline, endline;
 };
 
@@ -43,6 +45,8 @@ struct zebu_complex_command
 {
 	struct zebu_primary_expression* redirect_in;
 	struct zebu_primary_expression* redirect_out;
+	struct zebu_token* rinfd;
+	struct zebu_token* routfd;
 	struct {
 		struct zebu_simple_command** data;
 		unsigned n, cap;
@@ -61,8 +65,10 @@ struct zebu_conditional_expression
 
 struct zebu_equality_expression
 {
+	struct zebu_token* eq;
 	struct zebu_relational_expression* inner;
 	struct zebu_equality_expression* left;
+	struct zebu_token* nq;
 	struct zebu_relational_expression* right;
 	unsigned refcount, startline, endline;
 };
@@ -119,16 +125,22 @@ struct zebu_logical_or_expression
 
 struct zebu_multiplicative_expression
 {
+	struct zebu_token* div;
 	struct zebu_prefix_expression* inner;
 	struct zebu_multiplicative_expression* left;
+	struct zebu_token* mul;
+	struct zebu_token* rem;
 	struct zebu_prefix_expression* right;
 	unsigned refcount, startline, endline;
 };
 
 struct zebu_prefix_expression
 {
+	struct zebu_token* bitneg;
 	struct zebu_expression* file;
 	struct zebu_primary_expression* inner;
+	struct zebu_token* logneg;
+	struct zebu_token* numneg;
 	struct zebu_complex_command* shell;
 	struct zebu_prefix_expression* sub;
 	unsigned refcount, startline, endline;

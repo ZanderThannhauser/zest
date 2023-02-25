@@ -6,8 +6,5 @@ gen/test-build/./main.o: main.c debug.h memory/smalloc.h \
  cmdln/process.h cmdln/test_paths.h test/compare.h test/free.h \
  parser/find_tests.h record/struct.h record/compare.h record/free.h \
  parse_database.h cross_reference.h flatten_and_sort.h misc/mkdiropenat.h \
- flattened_records/struct.h string/struct.h test/struct.h \
- misc/recursive_unlink.h parser/zebu.h misc/unescape.h \
- evaluate/expression.h value/free.h value/struct.h value/kind.h \
- value/string/struct.h value/string/../struct.h store_database.h \
- flattened_records/free.h value/bool/struct.h value/bool/../struct.h
+ flattened_records/struct.h flattened_records/free.h string/struct.h \
+ test/struct.h store_database.h run_test.h

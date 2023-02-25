@@ -6,6 +6,8 @@ CPPFLAGS += -I .
 
 CFLAGS += -Wall -Werror -Wfatal-errors
 
+LDLIBS += -lgmp
+
 buildtype ?= release
 
 ifeq ($(buildtype), release)
@@ -55,7 +57,7 @@ depprefix   = dep/$(buildtype)-build
 
 default: $(buildprefix)/zest
 
-ARGS += -v
+#ARGS += -v
 
 ARGS += ./tests
 

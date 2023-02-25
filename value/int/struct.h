@@ -1,10 +1,12 @@
 
+#include <gmp.h>
+
 #include "../struct.h"
 
 struct int_value
 {
 	struct value super;
 	
-	int value;
+	mpz_t mpz;
 };
 

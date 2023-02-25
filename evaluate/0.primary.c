@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <debug.h>
 
 #include <parser/zebu.h>
@@ -6,6 +7,8 @@
 #include <misc/unescape.h>
 
 #include <value/string/new.h>
+
+#include <value/int/new.h>
 
 #include "0.primary.h"
 
@@ -23,11 +26,13 @@ struct value* evaluate_primary_expression(
 	{
 		struct unescaped content = unescape(expression->string);
 		
+		dpvsn(content.chars, content.n);
+		
 		result = new_string_value(content.chars, content.n);
 	}
 	else if (expression->integer)
 	{
-		TODO;
+		result = new_int_value_from_str((char*) expression->integer->data);
 	}
 	else
 	{
@@ -37,4 +42,19 @@ struct value* evaluate_primary_expression(
 	EXIT;
 	return result;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

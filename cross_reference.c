@@ -43,11 +43,6 @@ void cross_reference(
 		
 		if (cmp < 0)
 		{
-			TODO;
-			#if 0
-			dpvs(at->path);
-			dpv(at->index);
-			
 			struct record* record = new_record(at->path, at->index, 0.0);
 			
 			if (!avl_insert(records, record))
@@ -57,16 +52,12 @@ void cross_reference(
 			}
 			
 			tnode = tnode->next;
-			#endif
 		}
 		else if (cmp > 0)
 		{
-			TODO;
-			#if 0
 			struct avl_node_t* new = rnode->next;
 			avl_delete_node(records, rnode);
 			rnode = new;
-			#endif
 		}
 		else
 		{
@@ -95,12 +86,9 @@ void cross_reference(
 	
 	while (rnode)
 	{
-		TODO;
-		#if 0
 		struct avl_node_t* new = rnode->next;
 		avl_delete_node(records, rnode);
 		rnode = new;
-		#endif
 	}
 	
 	EXIT;

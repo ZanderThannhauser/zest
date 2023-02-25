@@ -16,8 +16,6 @@ void free_record(void* ptr)
 	
 	if (!--this->refcount)
 	{
-		dpvs(this->path);
-		
 		free_string(this->path);
 		
 		free(this);

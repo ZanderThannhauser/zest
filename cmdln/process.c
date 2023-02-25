@@ -1,4 +1,6 @@
 
+#include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include <debug.h>
@@ -35,7 +37,7 @@ void cmdln_process(int argc, char* const* argv)
 	test_paths = &argv[optind];
 	
 	if (!*test_paths)
-		fputs(usage_message, stdout), exit(1);
+		fputs(usage_message, stderr), exit(1);
 	
 	EXIT;
 }

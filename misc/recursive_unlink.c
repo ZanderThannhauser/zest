@@ -1,6 +1,5 @@
- #include <fcntl.h>       
- #include <sys/stat.h>
-
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -14,6 +13,8 @@
 #include <assert.h>
 
 #include <debug.h>
+
+#include <enums/error.h>
 
 #include <defines/argv0.h>
 

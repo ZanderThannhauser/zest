@@ -3,4 +3,4 @@ gen/debug-build/./evaluate/0.primary.o: evaluate/0.primary.c debug.h \
  enums/error.h avl/alloc_tree.h avl/tree_t.h avl/freeitem_t.h \
  avl/compare_t.h avl/node_t.h avl/free_tree.h avl/insert.h avl/search.h \
  avl/delete_node.h avl/tree_t.h parser/zebu.h misc/unescape.h \
- value/string/new.h evaluate/0.primary.h
+ value/string/new.h value/int/new.h evaluate/0.primary.h

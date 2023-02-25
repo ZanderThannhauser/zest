@@ -1,5 +1,9 @@
 
+#include <string.h>
+
 #include <debug.h>
+
+#include <memory/smalloc.h>
 
 #include "struct.h"
 #include "new.h"
@@ -12,7 +16,7 @@ struct string* new_string(const char* chars)
 	
 	unsigned len = strlen(chars);
 	
-	this->chars = memcpy(malloc(len + 1), chars, len + 1);
+	this->chars = memcpy(smalloc(len + 1), chars, len + 1);
 	this->len = len;
 	
 	this->refcount = 1;

@@ -1,4 +1,6 @@
 
+struct value_inheritance;
+
 #include "kind.h"
 
 struct value* new_value(

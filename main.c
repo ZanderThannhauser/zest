@@ -1,3 +1,8 @@
+
+#include <unistd.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stddef.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -9,11 +14,17 @@
 #include <defines/DATABASE_PATH.h>
 #include <defines/AGILITY.h>
 
+#include <enums/error.h>
+
 #include <cmdln/process.h>
 #include <cmdln/test_paths.h>
 
 #include <test/compare.h>
 #include <test/free.h>
+
+#include <avl/search.h>
+#include <avl/alloc_tree.h>
+#include <avl/free_tree.h>
 
 #include <parser/find_tests.h>
 
@@ -37,25 +48,17 @@
 
 #include <test/struct.h>
 
-/*#include <misc/unescape.h>*/
-
-/*#include <evaluate/expression.h>*/
-
-/*#include <value/free.h>*/
-
-/*#include <value/struct.h>*/
-
-/*#include <value/string/struct.h>*/
-
 #include <store_database.h>
-
-/*#include <value/bool/struct.h>*/
 
 #include <run_test.h>
 
 int main(int argc, char* const* argv)
 {
 	ENTER;
+	
+	#ifdef DEBUGGING
+	setvbuf(stdout, NULL, _IONBF, 0);
+	#endif
 	
 	cmdln_process(argc, argv);
 	
