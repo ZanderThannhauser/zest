@@ -1,12 +1,19 @@
 
+#include <string.h>
+#include <stdlib.h>
 #include <assert.h>
 
 #include <debug.h>
 
 #include <parser/zebu.h>
 
+#include <defines/argv0.h>
+
 #include <memory/srealloc.h>
 
+#include <enums/error.h>
+
+#include "hexchars.h"
 #include "unescape.h"
 
 struct unescaped unescape(
@@ -40,25 +47,38 @@ struct unescaped unescape(
 		{
 			case 'n': append('\n'); break;
 			
-			case 't':
-				TODO;
-				break;
+			case 't': append('\t'); break;
 			
-			case '0':
-				TODO;
-				break;
+			case '0': append('\0'); break;
 			
-			case '\"':
-				TODO;
-				break;
+			case '\\': append('\\'); break;
 			
-			case '\'':
-				TODO;
+			case '\"': append('\"'); break;
+			
+			case '\'': append('\''); break;
+			
+			case 'x':
+			{
+				char a = *start++, b = *start++;
+				
+				dpvc(a);
+				dpvc(b);
+				
+				unsigned code = (index(hexchars, a) - hexchars) << 4 | (index(hexchars, b) - hexchars);
+				
+				dpv(code);
+				
+				append(code);
+				
 				break;
+			}
 			
 			default:
-				TODO;
+			{
+				fprintf(stderr, "%s: unknown escape sequence '\\%c'!\n", argv0, c);
+				exit(e_syntax_error);
 				break;
+			}
 		}
 	}
 	

@@ -171,7 +171,7 @@ struct value* evaluate_shell_form(
 					if (dup2(pipes[0][i-1][0], 0) < 0)
 					{
 						TODO;
-						happy = false;
+						exit(errno);
 					}
 				}
 				else if (redirect_in.src > 0)
@@ -179,7 +179,7 @@ struct value* evaluate_shell_form(
 					if (dup2(redirect_in.src, redirect_in.dst) < 0)
 					{
 						TODO;
-						happy = false;
+						exit(errno);
 					}
 				}
 				else
@@ -187,37 +187,35 @@ struct value* evaluate_shell_form(
 					close(0);
 				}
 				
-				if (happy)
+				if (i + 1 < n)
 				{
-					if (i + 1 < n)
+					if (dup2(pipes[0][i][1], 1) < 0)
 					{
-						if (dup2(pipes[0][i][1], 1) < 0)
-						{
-							TODO;
-							happy = false;
-						}
-					}
-					else if (redirect_out.src > 0)
-					{
-						if (dup2(redirect_out.src, redirect_out.dst) < 0)
-						{
-							TODO;
-							happy = false;
-						}
-					}
-					else
-					{
-						close(1);
+						TODO;
+						exit(errno);
 					}
 				}
+				else if (redirect_out.src > 0)
+				{
+					if (dup2(redirect_out.src, redirect_out.dst) < 0)
+					{
+						TODO;
+					exit(errno);
+					}
+				}
+				else
+				{
+					close(1);
+				}
 				
-				if (happy && execvp(**args, *args) < 0)
+				if (execvp(**args, *args) < 0)
 				{
 					fprintf(stderr, "%s: error in shell exec('%s'): %m\n", argv0, **args);
 					happy = false;
+					exit(errno);
 				}
 				
-				exit(1);
+				abort();
 			}
 			else
 			{
@@ -253,9 +251,9 @@ struct value* evaluate_shell_form(
 				TODO;
 				happy = false;
 			}
-			else if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus))
+			else if (wstatus)
 			{
-				code = WEXITSTATUS(wstatus);
+				code = wstatus;
 			}
 		}
 	}

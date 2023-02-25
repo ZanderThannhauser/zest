@@ -1,9 +1,0 @@
-[{
-	"files": {
-		"./zest": "./gen/release-build/zest"
-	},
-	"commands": [
-		"./zest /bad/path"
-	],
-	"exit-code": 1,
-}]

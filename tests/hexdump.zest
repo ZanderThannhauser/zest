@@ -1,10 +1,19 @@
 
-"./hexdump":
+"./hexdump" (+x):
 	file("/tmp/hexdump");
 
-"./test.bin":
-	"abc" + " \t\n" + "\x41";
+"./test.bin": ""
+	+ " "
+	+ "abc"
+	+ "\t"
+	+ "\""
+	+ "\'"
+	+ "\\"
+	+ "\x41"
+	+ "\n";
 
 shell("./hexdump" "./test.bin" > "./stdout.txt") == 0;
 
-file("./stdout.txt") == "0 | a dojiawijaowidj | abc....\n";
+file("./stdout.txt") == ""
+	+ "00000000  20 61 62 63 09 22 27 5C 41 0A                    |.abc.\"\'\\A.|" + "\n"
+	+ "0000000A                                                   ||" + "\n";

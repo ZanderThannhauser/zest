@@ -5,9 +5,8 @@
 
 #include <memory/srealloc.h>
 
+#include "hexchars.h"
 #include "escape.h"
-
-static char* hexchars = "0123456789ABCDEF";
 
 char* escape(
 	char* chars,
@@ -49,6 +48,8 @@ char* escape(
 			case '/':
 			case ':':
 			case '-':
+			case '|':
+			case '!':
 			case '(': case ')':
 			case '[': case ']':
 			case '{': case '}':

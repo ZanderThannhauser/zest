@@ -48,6 +48,7 @@ srcs += ./main.c
 srcs += ./memory/smalloc.c
 srcs += ./memory/srealloc.c
 srcs += ./misc/escape.c
+srcs += ./misc/hexchars.c
 srcs += ./misc/mkdiropenat.c
 srcs += ./misc/opendirat.c
 srcs += ./misc/recursive_unlink.c
