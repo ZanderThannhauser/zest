@@ -24,17 +24,17 @@ struct value* evaluate_file_form(
 	
 	struct string_value* text = (void*) path;
 	
-	dpvsn(text->data, text->len);
+	dpvsn(text->chars, text->len);
 	
-	uint8_t chunk[4096], *data = NULL;
+	char chunk[4096], *data = NULL;
 	unsigned n = 0, cap = 0;
 	ssize_t res;
 	
-	int fd = open((char*) text->data, O_RDONLY);
+	int fd = open(text->chars, O_RDONLY);
 	
 	if (fd < 0)
 	{
-		fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, text->data);
+		fprintf(stderr, "%s: open(\"%s\"): %m\n", argv0, text->chars);
 		exit(e_failed_test);
 	}
 	else while (errno = 0, (res = read(fd, chunk, sizeof(chunk))) > 0)

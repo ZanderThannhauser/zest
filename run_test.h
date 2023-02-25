@@ -1,2 +1,6 @@
 
-bool run_test(int zest_dirfd, const struct test* test);
+struct zebu_test;
+
+bool run_test(
+	int test_dirfd,
+	struct zebu_test* test);

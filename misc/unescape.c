@@ -11,11 +11,11 @@ struct unescaped unescape(
 	ENTER;
 	
 	struct {
-		uint8_t* data;
+		char* data;
 		unsigned n, cap;
 	} buffer = {};
 	
-	void append(uint8_t c)
+	void append(char c)
 	{
 		if (buffer.n == buffer.cap)
 		{
@@ -26,7 +26,7 @@ struct unescaped unescape(
 		buffer.data[buffer.n++] = c;
 	}
 	
-	uint8_t* start = token->data + 1, *end = start + token->len - 2, c;
+	char* start = (char*) token->data + 1, *end = start + token->len - 2, c;
 	
 	while (start < end)
 	{

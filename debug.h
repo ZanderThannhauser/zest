@@ -85,8 +85,6 @@
 		fflush(stdout); \
 		char buffer[100];\
 		sprintf(buffer, "+%i", __LINE__);\
-		if (!fork()) \
-			execlp("gedit", "gedit", __FILE__, buffer, NULL);\
 		assert(!"TODO"); \
 	}
 	
@@ -98,8 +96,6 @@
 		fflush(stdout); \
 		char buffer[100];\
 		sprintf(buffer, "+%i", __LINE__);\
-		if (!fork()) \
-			execlp("gedit", "gedit", __FILE__, buffer, NULL);\
 		assert(!"CHECK"); \
 	}
 	
@@ -111,8 +107,6 @@
 		fflush(stdout); \
 		char buffer[100];\
 		sprintf(buffer, "+%i", __LINE__);\
-		if (!fork()) \
-			execlp("gedit", "gedit", __FILE__, buffer, NULL);\
 		assert(!"NOPE"); \
 	}
 	

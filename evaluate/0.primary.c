@@ -23,7 +23,7 @@ struct value* evaluate_primary_expression(
 	{
 		struct unescaped content = unescape(expression->string);
 		
-		result = new_string_value(content.data, content.n);
+		result = new_string_value(content.chars, content.n);
 	}
 	else if (expression->integer)
 	{

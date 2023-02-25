@@ -3,7 +3,7 @@ struct zebu_token;
 
 struct unescaped
 {
-	uint8_t* data;
+	char* chars;
 	unsigned n;
 };
 

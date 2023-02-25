@@ -83,7 +83,12 @@ struct zebu_expression
 
 struct zebu_file
 {
+	struct {
+		struct zebu_token** data;
+		unsigned n, cap;
+	} chmods;
 	struct zebu_expression* expression;
+	struct zebu_token* octal;
 	struct zebu_token* path;
 	unsigned refcount, startline, endline;
 };

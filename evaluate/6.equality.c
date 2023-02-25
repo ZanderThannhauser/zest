@@ -23,13 +23,21 @@ struct value* evaluate_equality_expression(
 	{
 		struct value* left = evaluate_equality_expression(expression->left);
 		
-		struct value* right = evaluate_relational_expression(expression->right);
+		if (left)
+		{
+			struct value* right = evaluate_relational_expression(expression->right);
+			
+			if (right)
+			{
+				int cmp = compare_values(left, right);
+				
+				TODO;
+			}
+			
+			free_value(right);
+		}
 		
-		int cmp = compare_values(left, right);
-		
-		TODO;
-		
-		free_value(left), free_value(right);
+		free_value(left);
 	}
 	else
 	{

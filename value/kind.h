@@ -5,8 +5,8 @@
 enum value_kind
 {
 	vk_bool,
+	vk_int,
 	vk_string,
-	vk_integer,
 };
 
 #endif

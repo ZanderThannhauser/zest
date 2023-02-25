@@ -5,7 +5,15 @@
 
 `integer`: ['0' - '9']+;
 
-file: `string` #path ":" expression #expression ';';
+`chmod`: ['u', 'g', 'o', 'a']*
+	(['-','+','='] (['r', 'w', 'x', 'X', 's', 't']+ | ['u', 'g', 'o']))+;
+
+`octal`: ['0'-'7'] ['0'-'7'] ['0'-'7'];
+
+file:
+	`string` #path
+	('(' (`chmod` #chmods[] (',' `chmod` #chmods[])* | `octal` #octal) ')')?
+	":" expression #expression ';';
 
 primary_expression
 	: '(' expression #sub ')'

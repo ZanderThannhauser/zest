@@ -8,7 +8,7 @@
 #include "new.h"
 
 struct value* new_string_value(
-	uint8_t* data,
+	char* chars,
 	unsigned len)
 {
 	ENTER;
@@ -18,7 +18,7 @@ struct value* new_string_value(
 		&string_value_inheritance,
 		sizeof(*this));
 	
-	this->data = data;
+	this->chars = chars;
 	this->len  = len;
 	
 	EXIT;

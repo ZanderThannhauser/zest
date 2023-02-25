@@ -1,13 +1,13 @@
 
 
-"./wc": file("/tmp/wc");
+"./wc" (+x): file("/tmp/wc");
 
 "./text.txt": ""
 	+ "abc" + "\n"
 	+ "def" + "\n"
 	+ "ghi" + "\n";
 
-shell("./wc" "-l" < "./test.txt" > "./stdout.txt") == 0;
+shell("./wc" "-l" < "./text.txt" > "./stdout.txt") == 0;
 
 file("./stdout.txt") == "3\n";
 
@@ -15,7 +15,7 @@ file("./stdout.txt") == "3\n";
 ---
 
 
-"./wc": file("/tmp/wc");
+"./wc" (+x): file("/tmp/wc");
 
 shell("./wc" "-l" "./test.txt" > "./stderr.txt") == 1;
 // shell("./wc" "-l" "./test.txt" >2 "./stderr.txt") == 1;

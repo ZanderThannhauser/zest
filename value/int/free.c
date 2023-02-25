@@ -4,13 +4,11 @@
 #include "struct.h"
 #include "free.h"
 
-void free_string_value(
+void free_int_value(
 	struct value* super)
 {
-	struct string_value* this = (void*) super;
+	struct int_value* this = (void*) super;
 	ENTER;
-	
-	free(this->chars);
 	
 	EXIT;
 }

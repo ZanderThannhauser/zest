@@ -34,7 +34,7 @@ struct value* evaluate_additive_expression(
 			result = NULL;
 		else switch (left->kind)
 		{
-			case vk_integer:
+			case vk_int:
 				TODO;
 				break;
 			
@@ -44,18 +44,18 @@ struct value* evaluate_additive_expression(
 				struct string_value* spef_right = (void*) right;
 				
 				unsigned len = spef_left->len + spef_right->len;
-				uint8_t *data = malloc(len + 1);
+				char *chars = malloc(len + 1);
 				
-				if (!data)
+				if (!chars)
 					fprintf(stderr, "%s: malloc(%u): %m\n", argv0, len),
 					result = NULL;
 				else
 				{
-					memcpy(data, spef_left->data, spef_left->len);
-					memcpy(data + spef_left->len, spef_right->data, spef_right->len);
-					data[len] = 0;
+					memcpy(chars, spef_left->chars, spef_left->len);
+					memcpy(chars + spef_left->len, spef_right->chars, spef_right->len);
+					chars[len] = 0;
 					
-					result = new_string_value(data, len);
+					result = new_string_value(chars, len);
 				}
 				break;
 			}
