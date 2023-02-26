@@ -2,7 +2,7 @@
 
 "./zest" (+x): file("./gen/release-build/zest");
 
-shell("./zest" >2 "./stderr.txt") == 1;
+shell("./zest" >2 "./stderr.txt") == 256;
 
 file("./stderr.txt") == "usage: zest [-vh] <test directories or files...>\n";
 

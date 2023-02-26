@@ -5,4 +5,4 @@ unset on_error
 make buildtype=debug
 make buildtype=test
 make buildtype=release
-sudo /home/zander/bin/zest ./tests -v
+sudo /home/zander/bin/zest ./tests

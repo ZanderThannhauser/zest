@@ -86,7 +86,7 @@ int main(int argc, char* const* argv)
 		struct record* record = flat->data[i];
 		
 		printf(
-			"\e[33m" "[%u/%u]: running test %u of '%s'..." "\e[m" "\n",
+			"\e[33m" "[%3u/%3u]: running test %u of '%s'..." "\e[m" "\n",
 			i + 1, n, record->index + 1, record->path->chars);
 		
 		fflush(stdout);
